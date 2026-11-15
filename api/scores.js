@@ -1,7 +1,3 @@
-// Vercel Function: global leaderboard backed by Upstash Redis (REST API).
-// Env (set by the Vercel Marketplace integration): KV_REST_API_URL + KV_REST_API_TOKEN
-// or UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN.
-
 const URL_ = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 
