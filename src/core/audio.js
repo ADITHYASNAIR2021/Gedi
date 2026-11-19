@@ -1,11 +1,36 @@
 // Chenda melam, procedural effects, and Gedi's recorded reactions.
 
 const CLIPS = {
-  aiyooo: { url: new URL('../../Audio/aiyooooo.m4a', import.meta.url), gain: 1.12, cooldown: 1.4 },
-  myre: { url: new URL('../../Audio/Myre.m4a', import.meta.url), gain: 1.45, cooldown: 10 },
+  aiyooo: { url: new URL('../../Audio/aiyooooo.m4a', import.meta.url), gain: 1.12, cooldown: 1.4, impact: true },
+  myre: { url: new URL('../../Audio/Myre.m4a', import.meta.url), gain: 1.45, cooldown: 10, spicy: true },
   onam: { url: new URL('../../Audio/mrkolayali-sayip-onam.mp3', import.meta.url), gain: 1 },
   melam: { url: '/assets/audio/chendamelam-loop.mp3', gain: 0.82 },
+  vembanadu: { url: new URL('../../Audio/vembanadu.mp3', import.meta.url), title: 'VEMBANADU', gain: 1.22, loop: [.30, 15.60] },
+  kasavinte: { url: new URL("../../Audio/Kasavinte'.mp3", import.meta.url), title: 'KASAVINTE', gain: 1.35, loop: [.14, 17.34] },
+  jailer: { url: new URL('../../Audio/Jailer.mp3', import.meta.url), title: 'JAILER', gain: .99, loop: [0, 28.96] },
+  manchatti: { url: new URL('../../Audio/Manchatti.m4a', import.meta.url), gain: 2.65, cooldown: 2, spicy: true, theri: [0, 1.4] },
+  punda: { url: new URL('../../Audio/Punda mone.m4a', import.meta.url), gain: 1.7, cooldown: 2, spicy: true, theri: [0, .69] },
+  thayoli: { url: new URL('../../Audio/Thayoli.m4a', import.meta.url), gain: 2.5, cooldown: 12, spicy: true, theri: [1.87, .79] },
+  ullas: { url: new URL('../../Audio/Thayoli2- ullas.m4a', import.meta.url), gain: 2.55, cooldown: 12, spicy: true, offset: .58, theri: [.58, 1.16] },
 };
+
+const IMPACT_LINES = { banana: 'manchatti', coconut: 'punda' };
+const RANDOM_LINES = ['thayoli', 'ullas'];
+const THERI_LINES = ['myre', 'manchatti', 'punda', 'thayoli', 'ullas'];
+
+// Blend across the wrap without changing the clip duration or keeping the leading silence.
+function softenLoop(buffer, [start, end]) {
+  const first = Math.round(start * buffer.sampleRate);
+  const last = Math.round(end * buffer.sampleRate);
+  const width = Math.min(Math.round(.054 * buffer.sampleRate), buffer.length - last);
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const data = buffer.getChannelData(ch);
+    for (let i = 0; i < width; i++) {
+      const weight = i / width;
+      data[first + i] = data[last + i] * (1 - weight) + data[first + i] * weight;
+    }
+  }
+}
 
 const MELAM_LENGTH = 22.548;
 // Accented transients in the prepared recording, measured from the loop cut.
@@ -92,8 +117,11 @@ export class GameAudio {
         .then((response) => response.ok ? response.arrayBuffer() : Promise.reject())
         .then((bytes) => ctx.decodeAudioData(bytes))
         .then((buffer) => {
+          if (clip.loop) softenLoop(buffer, clip.loop);
           this.clips[name] = buffer;
           if (name === 'melam' && this.musicOn) this.startMelam();
+          if (name === this.chapterMusic && this.musicOn) this.syncChapterMusic();
+          if (clip.theri) this.continueTheri();
         })
         .catch(() => {});
     }
@@ -103,6 +131,7 @@ export class GameAudio {
     if (!this.ctx) return;
     this.musicVolume.gain.value = this.settings.music ? 0.55 : 0;
     this.soundVolume.gain.value = this.settings.sound ? 1 : 0;
+    if (!this.settings.theri || !this.settings.sound || !this.settings.voice) this.setTheriMode(false);
     if (!this.settings.sound || !this.settings.voice) this.clearReaction();
   }
 
@@ -119,6 +148,7 @@ export class GameAudio {
     this.music.gain.setValueAtTime(1, t);
     this.nextTime = t + 0.05;
     this.startMelam();
+    this.syncChapterMusic();
     this.startAmbience();
     this.mix(0.06);
   }
@@ -129,11 +159,14 @@ export class GameAudio {
     const t = this.now;
     this.radio?.source?.stop(t);
     this.radio = null;
+    this.sceneTrack?.source.stop(t);
+    this.sceneTrack = null;
     this.melam?.stop(t);
     this.melam = null;
     this.air?.stop(t);
     this.air = null;
     this.airFilter = null;
+    this.setTheriMode(false);
     this.mix(0.04);
   }
 
@@ -149,10 +182,45 @@ export class GameAudio {
     source.connect(this.recording);
     this.recording.gain.cancelScheduledValues(t);
     this.recording.gain.setValueAtTime(0, t);
-    this.recording.gain.linearRampToValueAtTime(CLIPS.melam.gain, t + 0.2);
+    this.recording.gain.linearRampToValueAtTime(this.sceneTrack ? 0 : CLIPS.melam.gain, t + 0.2);
     this.fade(this.music.gain, 0, 0.035);
     source.start(this.melamStart);
   }
+
+  setChapterMusic(name) {
+    this.chapterMusic = name;
+    if (this.ctx && this.musicOn) this.syncChapterMusic();
+  }
+
+  syncChapterMusic() {
+    const name = this.clips[this.chapterMusic] ? this.chapterMusic : null;
+    const previous = this.sceneTrack;
+    if ((previous?.name ?? null) === name) return;
+    const t = this.now;
+    if (previous) {
+      this.fade(previous.gain.gain, 0, .07);
+      previous.source.stop(t + .34);
+    }
+    this.sceneTrack = null;
+    if (name) {
+      const clip = CLIPS[name];
+      const source = this.ctx.createBufferSource();
+      const gain = this.ctx.createGain();
+      source.buffer = this.clips[name];
+      source.loop = true;
+      source.loopStart = clip.loop[0];
+      source.loopEnd = Math.min(clip.loop[1], source.buffer.duration);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(clip.gain, t + .34);
+      source.connect(gain).connect(this.bed);
+      source.start(t, source.loopStart);
+      this.sceneTrack = { name, source, gain };
+    }
+    this.fade(this.recording.gain, name ? 0 : CLIPS.melam.gain, .09);
+    this.fade(this.music.gain, name || this.melam ? 0 : 1, .09);
+  }
+
+  get chapterMusicTitle() { return this.sceneTrack && this.settings.music ? CLIPS[this.sceneTrack.name].title : null; }
 
   setAmbience(cfg) {
     this.ambienceProfile = cfg.water ? [300, .16] : cfg.props.includes('waterfall') ? [850, .26]
@@ -183,19 +251,53 @@ export class GameAudio {
 
   mix(time) {
     const voice = !!(this.reaction || this.speech);
-    const bed = !this.musicOn ? 0 : voice ? 0.09 : this.radio ? 0.075 : 1;
+    const bed = !this.musicOn ? 0 : voice ? (this.sceneTrack ? .045 : .09) : this.radio ? .075 : 1;
     this.fade(this.bed.gain, bed, time);
     this.fade(this.sfx.gain, voice ? 0.30 : 1, time);
     this.fade(this.ambience.gain, this.musicOn ? this.ambienceProfile[1] * (voice ? 0.1 : 1) : 0, time);
   }
 
-  sample(name) {
+  impact(hazard) {
+    const line = IMPACT_LINES[hazard];
+    return (line && this.sample(line, 'impact')) || this.sample('aiyooo');
+  }
+
+  randomQuip() {
+    if (this.theriMode || this.reaction || this.speech || this.radio) return false;
+    const index = this.lastQuip === 0 ? 1 : this.lastQuip === 1 ? 0 : Math.floor(Math.random() * RANDOM_LINES.length);
+    this.lastQuip = index;
+    return this.sample(RANDOM_LINES[index]);
+  }
+
+  setTheriMode(active) {
+    const enabled = active && this.settings.theri && this.settings.sound && this.settings.voice;
+    if (enabled === !!this.theriMode) return;
+    this.theriMode = enabled;
+    if (enabled) {
+      this.theriIndex = 0;
+      if (this.reactionRole === 'quip') this.clearReaction();
+      this.continueTheri();
+    } else if (this.reactionRole === 'theri') {
+      this.clearReaction();
+    }
+  }
+
+  continueTheri() {
+    if (!this.ctx || !this.theriMode || this.reaction) return;
+    for (let i = 0; i < THERI_LINES.length; i++) {
+      const name = THERI_LINES[this.theriIndex];
+      this.theriIndex = (this.theriIndex + 1) % THERI_LINES.length;
+      if (this.sample(name, 'theri')) return;
+    }
+  }
+
+  sample(name, role = CLIPS[name]?.impact ? 'impact' : 'quip') {
     const clip = CLIPS[name];
     const buffer = this.clips[name];
-    if (!buffer || !this.settings.sound || !this.settings.voice || (name === 'myre' && !this.settings.theri)) return false;
+    if (!buffer || !this.settings.sound || !this.settings.voice || (clip.spicy && !this.settings.theri)) return false;
     const t = this.now;
-    if (t - (this.lastSample[name] ?? -Infinity) < clip.cooldown) return true;
-    if (this.reaction && name === 'myre') return true;
+    if (role !== 'theri' && t - (this.lastSample[name] ?? -Infinity) < clip.cooldown) return role !== 'impact';
+    if (this.reaction && role !== 'impact') return true;
     this.reaction?.stop(t + 0.012);
     this.cancelSpeech();
     this.pauseRadio();
@@ -207,21 +309,30 @@ export class GameAudio {
     source.onended = () => {
       if (this.reaction !== source) return;
       this.reaction = null;
+      this.reactionRole = null;
+      this.continueTheri();
+      if (this.reaction) return;
       this.resumeRadio();
       this.mix(0.14);
     };
     this.reaction = source;
-    this.lastSample[name] = t;
+    this.reactionRole = role;
+    if (role !== 'theri') this.lastSample[name] = t;
     this.mix(0.015);
-    source.start(t + 0.05);
+    const [offset, duration] = (role === 'theri' && clip.theri) || [clip.offset || 0, undefined];
+    if (duration) source.start(t + .05, offset, Math.min(duration, buffer.duration - offset));
+    else source.start(t + .05, offset);
     return true;
   }
 
   clearReaction() {
     this.reaction?.stop();
     this.reaction = null;
+    this.reactionRole = null;
     this.cancelSpeech();
     if (this.ctx) {
+      this.continueTheri();
+      if (this.reaction) return;
       this.resumeRadio();
       this.mix(0.1);
     }
@@ -236,7 +347,7 @@ export class GameAudio {
   get radioActive() { return !!this.radio; }
 
   playRadio() {
-    if (!this.clips.onam || !this.musicOn || !this.settings.music || this.radio || this.reaction || this.speech) return false;
+    if (!this.clips.onam || !this.musicOn || !this.settings.music || this.radio || this.reaction || this.speech || this.theriMode) return false;
     this.radio = { offset: 0, source: null };
     this.resumeRadio();
     this.mix(0.09);

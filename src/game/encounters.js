@@ -152,6 +152,10 @@ export const Encounters = {
     if (this.settings.music && !this.radioPlayed && this.distance >= this.startX + 125 && !this.pendingCard && !this.ambush?.shots) {
       this.radioPlayed = this.audio.playRadio();
     }
+    if (this.settings.theri && this.rage <= 0 && !this.pendingCard && (this.quipT -= dt) <= 0) {
+      this.quipT = rand(17, 31);
+      this.audio.randomQuip();
+    }
     if (!this.ambush && chapter.index === 1 && this.distance >= AMBUSH_AT) {
       const x = this.sw.pos.x;
       const rescue = this.level.addVehicle(makeAuto(true), x + 13, -1.6, 'AUTO SHORTCUT +60');

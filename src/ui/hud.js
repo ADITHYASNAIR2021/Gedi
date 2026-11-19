@@ -52,9 +52,10 @@ export class Hud {
 
   update(s) {
     const L = this.last;
-    if (L.radio !== s.radio) {
-      this.el.musicMode.textContent = s.radio ? '♫ ONAM RADIO' : 'THAALAM';
-      L.radio = s.radio;
+    const musicMode = s.theriMix ? 'THERI MIX' : s.radio ? '♫ ONAM RADIO' : s.soundtrack ? `♫ ${s.soundtrack}` : 'THAALAM';
+    if (L.musicMode !== musicMode) {
+      this.el.musicMode.textContent = musicMode;
+      L.musicMode = musicMode;
     }
     const rhythm = s.rhythm || 0;
     if (L.rhythm !== rhythm) {

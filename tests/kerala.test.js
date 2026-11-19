@@ -3,6 +3,7 @@ import test from 'node:test';
 import { AANAS, aanaAt } from '../src/game/aanas.js';
 import { GameAudio, recordedBeat } from '../src/core/audio.js';
 import { makeVallam, animateVallam } from '../src/entities/vallam.js';
+import { CHAPTERS } from '../src/game/story.js';
 
 function audioFixture() {
   function parameter() {
@@ -21,7 +22,7 @@ function audioFixture() {
       stop(time) { this.stopped = time; },
     }),
   };
-  for (const name of ['bed', 'sfx', 'ambience', 'soundVolume', 'musicVolume']) audio[name] = audio.ctx.createGain();
+  for (const name of ['bed', 'recording', 'music', 'sfx', 'ambience', 'soundVolume', 'musicVolume']) audio[name] = audio.ctx.createGain();
   Object.assign(audio.clips, { aiyooo: { duration: 1.135 }, myre: { duration: .749 }, onam: { duration: 7 } });
   audio.musicOn = true;
   return audio;
@@ -71,6 +72,82 @@ test('music and Theri settings suppress their respective audio requests', () => 
   audio.stopMusic();
   assert.equal(audio.bed.gain.target, 0);
   assert.ok(audio.reaction);
+});
+
+test('chapter changes loop their assigned tracks and fade the outgoing bed', () => {
+  const audio = audioFixture();
+  const durations = [15.86, 17.48, 30.93];
+  const ids = CHAPTERS.slice(2).map(chapter => chapter.music);
+  assert.deepEqual(ids, ['vembanadu', 'kasavinte', 'jailer']);
+
+  ids.forEach((name, i) => {
+    audio.clips[name] = { duration: durations[i] };
+    const previous = audio.sceneTrack;
+    audio.setChapterMusic(name);
+    assert.equal(audio.sceneTrack.name, name);
+    assert.equal(audio.sceneTrack.source.loop, true);
+    assert.equal(audio.sceneTrack.source.started[1], audio.sceneTrack.source.loopStart);
+    assert.ok(audio.sceneTrack.source.loopEnd <= durations[i]);
+    assert.equal(audio.recording.gain.target, 0);
+    if (previous) assert.ok(previous.source.stopped > audio.ctx.currentTime);
+  });
+  audio.setChapterMusic(CHAPTERS[0].music);
+  assert.equal(audio.sceneTrack, null);
+  assert.ok(audio.recording.gain.target > 0);
+});
+
+test('hazard voices use their assigned recordings, with Aiyooo in clean mode', () => {
+  const audio = audioFixture();
+  audio.clips.manchatti = { duration: 2.2 };
+  audio.clips.punda = { duration: .697 };
+  assert.equal(audio.impact('banana'), true);
+  assert.equal(audio.reaction.buffer, audio.clips.manchatti);
+  const banana = audio.reaction;
+  audio.ctx.currentTime++;
+  assert.equal(audio.impact('coconut'), true);
+  assert.ok(banana.stopped < audio.reaction.started[0]);
+  assert.equal(audio.reaction.buffer, audio.clips.punda);
+  audio.settings.theri = false;
+  assert.equal(audio.impact('banana'), true);
+  assert.equal(audio.reaction.buffer, audio.clips.aiyooo);
+});
+
+test('Theri follows the current impact, cycles all lines without overlap and stops at exit', () => {
+  const audio = audioFixture();
+  Object.assign(audio.clips, { manchatti: { duration: 2.2 }, punda: { duration: .697 },
+    thayoli: { duration: 3.58 }, ullas: { duration: 3.86 } });
+  audio.impact('banana');
+  const hitVoice = audio.reaction;
+  audio.setTheriMode(true);
+  assert.equal(audio.reaction, hitVoice);
+  const played = [];
+  for (let i = 0; i < 6; i++) {
+    audio.ctx.currentTime += 2.4;
+    audio.reaction.onended();
+    assert.equal(audio.reactionRole, 'theri');
+    played.push(Object.keys(audio.clips).find(name => audio.clips[name] === audio.reaction.buffer));
+  }
+  assert.deepEqual(played, ['myre', 'manchatti', 'punda', 'thayoli', 'ullas', 'myre']);
+  const last = audio.reaction;
+  audio.setTheriMode(false);
+  last.onended();
+  assert.equal(audio.reaction, null);
+  assert.equal(audio.bed.gain.target, 1);
+});
+
+test('random clips alternate on quiet stretches and yield to radio and voice playback', () => {
+  const audio = audioFixture();
+  audio.clips.thayoli = { duration: 3.58 };
+  audio.clips.ullas = { duration: 3.86 };
+  assert.equal(audio.playRadio(), true);
+  assert.equal(audio.randomQuip(), false);
+  audio.radio.source.onended();
+  assert.equal(audio.randomQuip(), true);
+  const first = audio.reaction.buffer;
+  assert.equal(audio.randomQuip(), false);
+  audio.reaction.onended();
+  assert.equal(audio.randomQuip(), true);
+  assert.notEqual(audio.reaction.buffer, first);
 });
 
 test('all chapters have distinct first-grab album encounters and older saves retain progress', async () => {

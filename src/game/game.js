@@ -14,8 +14,8 @@ const RAGE_TIME = 8;
 const MAX_HEALTH = 100;
 const FALL_DAMAGE = 35;
 const HITS = {
-  banana: { damage: 15, carry: 0.82, drop: 3, stun: 0.28, shake: 0.13 },
-  coconut: { damage: 25, carry: 0.63, drop: 5, stun: 0.48, shake: 0.24 },
+  banana: { damage: 15, carry: 0.82, drop: 3, stun: 0.28, shake: 0.13, label: 'BANANA BONK!' },
+  coconut: { damage: 25, carry: 0.63, drop: 5, stun: 0.48, shake: 0.24, label: 'COCONUT BONK!' },
 };
 const rand = (a, b) => a + Math.random() * (b - a);
 const v3 = new THREE.Vector3();
@@ -57,7 +57,7 @@ export class Game {
       sling: null, sneezeT: 0, fallT: 0, dying: 0, slowmo: 0, bounceCooldown: 0, cfgName: '', fireworkT: 1, coconutT: 2, tauntT: 4,
       kthrowT: 3, replyT: 0, theriPopT: 0, theri: 0, rage: 0, dustT: 0, pendingCard: null, holding: true,
       grabbed: new Set(), tut: { grabs: 0, releases: 0 },
-      radioPlayed: false, ambush: null, coconutWarning: null, vallamSeen: false,
+      radioPlayed: false, ambush: null, coconutWarning: null, vallamSeen: false, quipT: rand(14, 25),
       stats: { elephants: 0, perfects: 0, anjaam: 0, theri: 0, names: [] },
     });
     this.applyBiome(chapterAt(startX), true);
@@ -92,6 +92,8 @@ export class Game {
       shield: this.shield, magnet: this.magnet > 0, chapterName: ch.cfg.name, progress: progressK,
       beat: this.audio.beatPhase(), theri: this.theri, rage: this.rage > 0,
       radio: this.audio.radioActive,
+      soundtrack: this.audio.chapterMusicTitle,
+      theriMix: this.audio.theriMode,
       attached: !!this.current, perfect: !!this.current && perfectRelease(this.sw.vel),
       rhythm: this.perks.rhythm, festival: this.perks.level, teaCharge: this.perks.teaCharge,
       teaCombo: this.t < this.perks.teaUntil,
@@ -129,6 +131,7 @@ export class Game {
     this.stage.setBiome(ch.cfg, instant);
     this.env.setBiome(ch.cfg);
     this.audio.setTempo(ch.cfg.bpm);
+    this.audio.setChapterMusic(ch.cfg.music);
     this.audio.setAmbience?.(ch.cfg);
     if (!instant && !this.demo) this.hud.banner(ch.cfg.name, ch.cfg.place);
   }
@@ -262,6 +265,7 @@ export class Game {
     this.stunned = 0;
     this.gedi.setRage(true);
     this.hud.setRage(true);
+    this.audio.setTheriMode(true);
     this.sfx('rage');
     this.pop(this.settings.theri ? 'THERI MODE!!' : 'RAGE MODE!!', 'rage', this.sw.pos, 4.4);
     this.stage.shake = 0.8;
@@ -281,6 +285,7 @@ export class Game {
       this.theri = 0;
       this.gedi.setRage(false);
       this.hud.setRage(false);
+      this.audio.setTheriMode(false);
     }
   }
 
@@ -307,11 +312,11 @@ export class Game {
     this.sw.vel.y -= hit.drop;
     this.sfx('bonk');
     this.stage.shake = hit.shake;
-    this.takeDamage(hit.damage);
+    this.takeDamage(hit.damage, type);
     if (this.health > 0) this.addTheri(type === 'coconut' ? 0.38 : 0.26);
   }
 
-  takeDamage(amount) {
+  takeDamage(amount, hazard) {
     const lost = Math.min(this.health, amount);
     this.health -= lost;
     this.style = null;
@@ -319,8 +324,8 @@ export class Game {
     this.audio.setFestival?.(0);
     this.combo = 1;
     this.stats.theri++;
-    this.pop(`AIYOOO! −${lost} HP`, 'damage');
-    this.audio.sample?.('aiyooo');
+    this.pop(`${HITS[hazard]?.label || 'AIYOOO!'} −${lost} HP`, 'damage');
+    this.audio.impact(hazard);
     if (this.health > 0) return;
     this.detach();
     this.sling = null;

@@ -15,7 +15,7 @@ function runFixture() {
     sw: new Swinger(), perks: new RunPerks(), level: new Level(scene),
     stage: { scene }, fx: { sparkle() {}, dust() {} },
     gedi: {}, settings: { music: false },
-    audio: { sample: (name) => samples.push(name), stopMusic() {} },
+    audio: { impact: (hazard) => samples.push(hazard ?? 'fall'), stopMusic() {} },
     health: 100, bonus: 0, combo: 3, shield: false, invuln: 0, stunned: 0, theri: 0, rage: 0,
     demo: false, t: 0, projectiles: [], startX: 0, distance: 0,
     cfg: CHAPTERS[0], cfgName: CHAPTERS[0].name, stats: { theri: 0 },
@@ -40,7 +40,7 @@ test('chaya blocks one hit, recovery blocks a repeat, and chakka caps healing at
   assert.equal(game.health, 75);
   assert.equal(game.combo, 1);
   assert.equal(game.sw.vel.y, -5);
-  assert.deepEqual(samples, ['aiyooo']);
+  assert.deepEqual(samples, ['coconut']);
   game.collect('chakka');
   assert.equal(game.health, 100);
 });
@@ -53,7 +53,7 @@ test('a lethal fall starts game over and clears any pending chapter card', () =>
   assert.equal(game.health, 0);
   assert.equal(game.dying, 1.4);
   assert.equal(game.pendingCard, null);
-  assert.deepEqual(samples, ['aiyooo']);
+  assert.deepEqual(samples, ['fall']);
 });
 
 test('a banana crossing between frames hits Gedi, while a close dodge scores once', () => {

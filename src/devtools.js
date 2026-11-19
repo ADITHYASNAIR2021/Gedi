@@ -74,13 +74,17 @@ export function installInspector({ game, stage, startRun, toMenu, getState, devi
     button.onclick = () => { if (getState() === 'play') run(); };
     return button;
   };
-  const impact = action('Test coconut hit', () => {
+  const impact = type => {
     if (game.fallT || game.dying) return;
     game.invuln = 0;
-    game.spawnProjectile('coconut', game.sw.pos.x, game.sw.pos.y + 0.6, 0, -4, 22);
-  });
+    game.spawnProjectile(type, game.sw.pos.x, game.sw.pos.y + 0.6, 0, -4, 22);
+  };
+  const coconut = action('Test coconut hit', () => impact('coconut'));
+  const banana = action('Test banana hit', () => impact('banana'));
+  const theri = action('Test Theri Mode', () => game.addTheri(1));
   const radio = action('Test radio', () => game.audio.playRadio());
   const reply = action('Test Myre', () => game.shout(true));
+  const quip = action('Test random clip', () => game.audio.randomQuip());
   const dropOn = (place) => {
     if (game.fallT || game.dying || game.sling) return;
     game.detach();
@@ -101,7 +105,7 @@ export function installInspector({ game, stage, startRun, toMenu, getState, devi
   const boat = action('Test vallam', () => dropOn(x => game.level.addBoat(x, -0.8, true).mesh));
   const line = () => panel.append(document.createElement('br'));
   panel.append('LOCAL QA · not included in release'); line(); panel.append(select, play); line();
-  panel.append(auto, autoLabel); line(); panel.append(touch, touchLabel); line(); panel.append(boss, finish); line(); panel.append(tea, rhythm); line(); panel.append(face, rump, normal); line(); panel.append(impact, radio, reply); line(); panel.append(bus, autoRoof, boat); line(); panel.append(hide, stats);
+  panel.append(auto, autoLabel); line(); panel.append(touch, touchLabel); line(); panel.append(boss, finish); line(); panel.append(tea, rhythm); line(); panel.append(face, rump, normal); line(); panel.append(coconut, banana); line(); panel.append(radio, reply, theri, quip); line(); panel.append(bus, autoRoof, boat); line(); panel.append(hide, stats);
   document.body.append(panel);
   let frames = 0, elapsed = 0, display = 0;
   const original = game.update.bind(game);
@@ -112,8 +116,11 @@ export function installInspector({ game, stage, startRun, toMenu, getState, devi
     if (display < 0.5) return;
     const info = stage.renderer.info;
     const v = game.sw.vel;
-    const sound = game.audio.reaction ? 'Reaction foreground' : game.audio.radioActive ? 'Onam playing' : game.audio.melam ? 'Recorded melam looping' : 'Melam stopped';
-    stats.textContent = `${getState()} · ${Math.round(frames / elapsed)} fps\n${info.render.calls} draws · ${Math.round(info.render.triangles / 1000)}k triangles\n${info.memory.geometries} geometries · ${info.memory.textures} textures\n${game.snapshot().distance}m · ${game.health} HP · ${Math.hypot(v.x, v.y).toFixed(1)}m/s\n${sound}`;
+    const sound = game.audio;
+    const clip = sound.reaction && Object.keys(sound.clips).find(name => sound.clips[name] === sound.reaction.buffer);
+    const loop = sound.chapterMusicTitle;
+    const soundStatus = clip ? `Voice · ${sound.reactionRole} · ${clip}` : sound.radioActive ? 'Onam playing' : loop ? `${loop} looping` : sound.melam ? 'Recorded melam looping' : 'Melam stopped';
+    stats.textContent = `${getState()} · ${Math.round(frames / elapsed)} fps\n${info.render.calls} draws · ${Math.round(info.render.triangles / 1000)}k triangles\n${info.memory.geometries} geometries · ${info.memory.textures} textures\n${game.snapshot().distance}m · ${game.health} HP · ${Math.hypot(v.x, v.y).toFixed(1)}m/s\n${soundStatus}`;
     frames = 0; elapsed = 0; display = 0;
   };
 }

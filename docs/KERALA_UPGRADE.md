@@ -5,13 +5,14 @@ This log tracks the approved audio, elephant and scenery work. The references be
 | Work | Status | Check before completion |
 |---|---|---|
 | Chendamelam loop and voice priority | Implemented | Recorded 22.548-second loop with 36 mapped beat accents. Web Audio ducks the bed and ambience during the foreground voice and resumes Onam from the interrupted position. |
+| Regional songs and expanded reactions | Implemented | Vembanadu in Alappuzha, Kasavinte in Munnar, and Jailer in Pooram Night. Head hits have distinct voices. Theri Mode repeats the clips one at a time until it ends. |
 | Elephant presentation and Aana Album | Implemented | Added real coat and trunk textures, refined head silhouette and fitted ornaments on the existing rig. Twelve named encounters unlock the Album on first grab and persist in the existing local save. |
 | Pooram and Thirunakkara | Implemented | Rebuilt the large Pooram entrance and night lamps. Kottayam appears as a photographed story interlude before Alappuzha. |
 | Athirappilly | Implemented | Wide real-photo waterfall set piece with animated flow highlights, rocks and spray. |
 | Alappuzha | Implemented | Punnamada photo backdrop, low banks, moving chundan vallams with 20 animated paddlers, and a one-time 45-point race rescue. |
 | Munnar | Implemented | Curved tea rows, shade trees and valley mist layered behind the swing route. |
 | Paappans, riders and crowds | Implemented | Seated paappans, animated fans and whisks, instanced cheering spectators and chenda players. |
-| Build and local playtest | Complete | All 34 tests and the production build passed. Smoke-tested the five chapters and the compact Album in Chrome. |
+| Build and local playtest | Complete | All 38 tests and the production build passed. Smoke-tested the five chapters and the compact Album in Chrome. |
 | Physical phone playtest | Pending | Check sustained frame rate, touchscreen handling, loop seam and speaker balance on iPhone Safari and Android Chrome. |
 | Public audio reuse | Awaiting source details | Confirm source or permission for the supplied tracks before public distribution. |
 
@@ -19,12 +20,15 @@ This log tracks the approved audio, elephant and scenery work. The references be
 
 The prepared melam uses the 0.400–22.948-second region of the supplied recording. An 18 ms blend at the loop seam softens the cut. The game uses the measured accented transients for Thaalam timing and can fall back to its procedural score if the recording cannot load.
 
+Chapter loops trim the dead air at the restart and blend the audio across the seam. Chendamelam remains the music in Pooram Morning and Athirappilly and supplies the visual Thaalam timing in the chapters with guest songs. Manchatti plays on banana damage, Punda Mone on coconut damage, and the two Thayoli recordings appear on occasional quiet stretches. The new voices follow the Theri, Sound and Voice settings. Aiyooo remains the ground-fall and clean-mode hit reaction.
+
 ## Playtest notes
 
 - A live swing to Guruvayur Kesavan triggered the unlock toast. The Album kept the entry after a reload.
 - Chrome entered all five chapter scenes in a 568 × 320 touch preview. The Kottayam interlude displayed the real temple photo before the Alappuzha card.
 - The moving race deck awarded 45 points in Chrome. The rescue check gives the deck priority above the elephant sling in water.
 - Onam resumed after recorded Myre and Aiyooo reactions in Chrome. It also paused and resumed with the game and handed back to the melam. Automated checks cover clip priority and the first beat after the loop wraps.
+- Chrome loaded all three new chapter songs, played the assigned banana and coconut reactions, cycled the Theri voices and returned to the chapter song. Chrome also played Aiyooo with Theri disabled.
 - At 568 × 320 the Album scrolls internally and the replay control fits in the viewport. The standard menu opens the Album outside the inspector.
 
 ## References and resources
