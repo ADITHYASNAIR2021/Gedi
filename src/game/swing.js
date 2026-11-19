@@ -74,14 +74,17 @@ export class Swinger {
     const clearance = Math.max(T.minLen, anchor.pos.y - T.groundClear);
     this.targetLen = Math.min(this.len, T.maxLen, clearance);
     this.catchRemaining = T.catchTime;
+    const av = anchor.vel;
+    const relativeX = this.vel.x - (av?.x ?? 0);
+    const relativeY = this.vel.y - (av?.y ?? 0);
     this.catchSpeed = null;
     if (dy < -0.25 * d) {
       // hanging below the anchor: the trunk flings Gedi along the forward (counter-clockwise) arc
       const tx = -dy / d;
       const ty = dx / d;
-      const vt = this.vel.x * tx + this.vel.y * ty;
+      const vt = relativeX * tx + relativeY * ty;
       this.catchSpeed = Math.max(vt * T.grabBoost, anchor.el?.personality?.speed || T.minGrabSpeed);
-    } else if (this.vel.x < 5) {
+    } else if (relativeX < 5) {
       this.catchSpeed = 5;
     }
   }
@@ -113,11 +116,12 @@ export class Swinger {
       const tx = -dy / d;
       const ty = dx / d;
       const catchK = 1 - Math.min(1, this.catchRemaining / T.catchTime);
+      const catchEase = catchK * catchK * (3 - 2 * catchK);
       if (this.catchRemaining > 0) {
         this.catchRemaining = Math.max(0, this.catchRemaining - dt);
         if (this.catchSpeed !== null) {
-          const vt = v.x * tx + v.y * ty;
-          const assistance = Math.max(0, this.catchSpeed - vt) * (1 - Math.exp(-dt * 12));
+          const vt = (v.x - av.x) * tx + (v.y - av.y) * ty;
+          const assistance = Math.max(0, this.catchSpeed - vt) * (1 - Math.exp(-dt * (7 + 10 * catchEase)));
           v.x += tx * assistance; v.y += ty * assistance;
         }
       }
@@ -127,9 +131,9 @@ export class Swinger {
 
       if (taut && dy < 0) {
         // keep the swing at a steady, readable amplitude (never a dead hang, never a wild spin)
-        const vt = v.x * tx + v.y * ty;
+        const vt = (v.x - av.x) * tx + (v.y - av.y) * ty;
         const height = p.y - (a.y - this.len);
-        const energy = 0.5 * (v.x * v.x + v.y * v.y) + T.gravity * height;
+        const energy = 0.5 * ((v.x - av.x) ** 2 + (v.y - av.y) ** 2) + T.gravity * height;
         const want = Math.max(T.gravity * this.len * (1 - Math.cos(T.swingAngle)), 0.5 * T.minSwing * T.minSwing);
         if (energy < want) {
           const dir = vt < -1 ? -0.6 : 1;
@@ -142,10 +146,10 @@ export class Swinger {
       if (this.len > this.targetLen) {
         // reel in; snap fast when the arc would scrape the ground
         const fast = this.len > clearance + 0.05;
-        const reelSpeed = (fast ? 17 : T.reel) * (0.3 + 0.7 * catchK);
+        const reelSpeed = (fast ? 17 : T.reel) * (0.35 + 0.65 * catchEase);
         const newLen = Math.max(this.targetLen, this.len - reelSpeed * dt);
         if (!fast && taut) {
-          const vt = v.x * tx + v.y * ty;
+          const vt = (v.x - av.x) * tx + (v.y - av.y) * ty;
           const boost = (this.len / newLen - 1) * vt;
           v.x += tx * boost;
           v.y += ty * boost;

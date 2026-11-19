@@ -2,14 +2,16 @@
 
 const $ = (id) => document.getElementById(id);
 
-const SCREENS = ['screen-menu', 'screen-story', 'screen-over', 'screen-board', 'screen-pause'];
+const SCREENS = ['screen-menu', 'screen-story', 'screen-over', 'screen-board', 'screen-pause', 'screen-album'];
 
 export class Hud {
   constructor() {
     this.el = {
       hud: $('hud'), score: $('h-score'), dist: $('h-dist'), best: $('h-best'), chapter: $('h-chapter'),
-      progress: $('h-progress'), lives: $('h-lives'), combo: $('h-combo'), shield: $('h-shield'), magnet: $('h-magnet'),
-      drum: $('h-drum'), theri: $('h-theri-fill'), popups: $('popups'), banner: $('banner'), hint: $('hint'),
+      progress: $('h-progress'), health: $('h-health'), healthPanel: $('health-panel'), healthMeter: $('h-health-meter'),
+      combo: $('h-combo'), shield: $('h-shield'), magnet: $('h-magnet'),
+      drum: $('h-drum'), musicMode: $('music-mode'), theri: $('h-theri-fill'),
+      popups: $('popups'), banner: $('banner'), hint: $('hint'),
     };
     this.last = {};
     this.lastPopupAt = 0;
@@ -30,6 +32,8 @@ export class Hud {
     if (!on) {
       this.el.popups.replaceChildren();
       this.el.banner.classList.add('hidden');
+      $('aana-unlock').classList.add('hidden');
+      clearTimeout(this.unlockTimer);
     }
   }
 
@@ -48,6 +52,10 @@ export class Hud {
 
   update(s) {
     const L = this.last;
+    if (L.radio !== s.radio) {
+      this.el.musicMode.textContent = s.radio ? '♫ ONAM RADIO' : 'THAALAM';
+      L.radio = s.radio;
+    }
     const rhythm = s.rhythm || 0;
     if (L.rhythm !== rhythm) {
       const titles = ['Find the beat', 'Melam warming up', 'Pooram rising', 'POORAM UNLEASHED'];
@@ -87,7 +95,15 @@ export class Hud {
     if (L.chapter !== s.chapterName) this.el.chapter.textContent = L.chapter = s.chapterName;
     const pct = Math.round(Math.min(1, Math.max(0, s.progress)) * 100);
     if (L.pct !== pct) { this.el.progress.style.width = `${pct}%`; L.pct = pct; }
-    if (L.lives !== s.lives) { this.el.lives.textContent = '🐘'.repeat(Math.max(0, s.lives)); L.lives = s.lives; }
+    if (L.health !== s.health) {
+      const { health, healthPanel, healthMeter } = this.el;
+      health.textContent = s.health;
+      healthMeter.setAttribute('aria-valuenow', s.health);
+      healthPanel.style.setProperty('--health', s.health / 100);
+      healthPanel.classList.toggle('is-low', s.health > 0 && s.health <= 30);
+      healthPanel.classList.toggle('is-hit', L.health > s.health);
+      L.health = s.health;
+    }
     if (L.combo !== s.combo) { this.el.combo.textContent = s.combo > 1 ? `×${s.combo}` : ''; L.combo = s.combo; }
     if (L.shield !== s.shield) { this.el.shield.classList.toggle('hidden', !s.shield); L.shield = s.shield; }
     if (L.magnet !== s.magnet) { this.el.magnet.classList.toggle('hidden', !s.magnet); L.magnet = s.magnet; }
@@ -101,6 +117,39 @@ export class Hud {
   drumHit() {
     this.el.drum.classList.add('hit');
     this.drumT = performance.now() + 300;
+  }
+
+  aanaUnlock(name) {
+    const toast = $('aana-unlock');
+    $('aana-unlock-name').textContent = name;
+    toast.classList.remove('hidden');
+    clearTimeout(this.unlockTimer);
+    this.unlockTimer = setTimeout(() => toast.classList.add('hidden'), 3600);
+  }
+
+  renderAlbum(entries, chapters, unlocked, latestChapter) {
+    const list = $('a-list');
+    list.replaceChildren();
+    $('a-count').textContent = `${entries.filter(aana => unlocked[aana.id]).length} of ${entries.length} discovered`;
+    for (const aana of entries) {
+      const item = document.createElement('li');
+      item.classList.toggle('is-found', !!unlocked[aana.id]);
+      const icon = document.createElement('span');
+      icon.textContent = unlocked[aana.id] ? '🐘' : '◇';
+      icon.setAttribute('aria-hidden', 'true');
+      const copy = document.createElement('div');
+      const name = document.createElement('b');
+      name.textContent = aana.name;
+      const detail = document.createElement('small');
+      detail.textContent = `${chapters[aana.chapter].name} · ${unlocked[aana.id] ? 'Discovered' : 'To find'}`;
+      copy.append(name, detail);
+      item.append(icon, copy);
+      list.append(item);
+    }
+    const select = $('a-chapter');
+    select.replaceChildren(...chapters.slice(0, latestChapter + 1).map((ch, i) => new Option(ch.name, String(i))));
+    select.value = String(latestChapter);
+    list.scrollTop = 0;
   }
 
   popup(text, xPct, yPct, cls = '') {
@@ -142,7 +191,7 @@ export class Hud {
         if (p.img) {
           const img = new Image();
           img.src = p.img;
-          img.alt = 'Gedi';
+          img.alt = p.alt || 'Gedi';
           media.appendChild(img);
         } else {
           media.textContent = p.emoji || '🐘';

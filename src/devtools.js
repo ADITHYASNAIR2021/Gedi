@@ -1,11 +1,12 @@
 // Local-only QA controls. This module is omitted from production builds.
 import { CHAPTERS } from './game/story.js';
+import { makeBus, makeAuto } from './entities/vehicles.js';
 import * as THREE from 'three';
 
 export function installInspector({ game, stage, startRun, toMenu, getState, device }) {
   const panel = document.createElement('aside');
   panel.id = 'inspector';
-  panel.style.cssText = 'position:fixed;z-index:12;top:70px;left:12px;background:#102d26ed;border:1px solid #f1cb77;color:#fff6df;padding:10px;border-radius:8px;font:11px system-ui;max-width:220px;touch-action:manipulation';
+  panel.style.cssText = 'position:fixed;z-index:12;top:70px;left:12px;background:#102d26ed;border:1px solid #f1cb77;color:#fff6df;padding:10px;border-radius:8px;font:11px system-ui;max-width:220px;max-height:calc(100dvh - 80px);overflow:auto;touch-action:pan-y';
   const select = document.createElement('select');
   select.setAttribute('aria-label', 'QA chapter');
   CHAPTERS.forEach((ch, i) => select.add(new Option(ch.name, i)));
@@ -67,9 +68,40 @@ export function installInspector({ game, stage, startRun, toMenu, getState, devi
   const face = document.createElement('button'); face.textContent = 'Inspect face'; face.onclick = () => inspect(-1);
   const rump = document.createElement('button'); rump.textContent = 'Inspect rump'; rump.onclick = () => inspect(1);
   const normal = document.createElement('button'); normal.textContent = 'Resume view'; normal.onclick = () => { game.paused = false; };
+  const action = (name, run) => {
+    const button = document.createElement('button');
+    button.textContent = name;
+    button.onclick = () => { if (getState() === 'play') run(); };
+    return button;
+  };
+  const impact = action('Test coconut hit', () => {
+    if (game.fallT || game.dying) return;
+    game.invuln = 0;
+    game.spawnProjectile('coconut', game.sw.pos.x, game.sw.pos.y + 0.6, 0, -4, 22);
+  });
+  const radio = action('Test radio', () => game.audio.playRadio());
+  const reply = action('Test Myre', () => game.shout(true));
+  const dropOn = (place) => {
+    if (game.fallT || game.dying || game.sling) return;
+    game.detach();
+    game.setHold(false);
+    game.bounceCooldown = 0;
+    game.bounceSpring = null;
+    const { x } = game.sw.pos;
+    const mesh = place(x);
+    game.sw.reset(x, mesh.userData.top + 2.85);
+    game.sw.vel.y = -15;
+  };
+  const testRoof = (make, label) => dropOn(x => {
+    const mesh = make();
+    return game.level.addVehicle(mesh, x - (mesh.userData.center ?? 0), -0.8, label).mesh;
+  });
+  const bus = action('Test KSRTC', () => testRoof(makeBus, 'KSRTC RESCUE!'));
+  const autoRoof = action('Test auto', () => testRoof(makeAuto, 'AUTO CHETTAN SAVE!'));
+  const boat = action('Test vallam', () => dropOn(x => game.level.addBoat(x, -0.8, true).mesh));
   const line = () => panel.append(document.createElement('br'));
   panel.append('LOCAL QA · not included in release'); line(); panel.append(select, play); line();
-  panel.append(auto, autoLabel); line(); panel.append(touch, touchLabel); line(); panel.append(boss, finish); line(); panel.append(tea, rhythm); line(); panel.append(face, rump, normal); line(); panel.append(hide, stats);
+  panel.append(auto, autoLabel); line(); panel.append(touch, touchLabel); line(); panel.append(boss, finish); line(); panel.append(tea, rhythm); line(); panel.append(face, rump, normal); line(); panel.append(impact, radio, reply); line(); panel.append(bus, autoRoof, boat); line(); panel.append(hide, stats);
   document.body.append(panel);
   let frames = 0, elapsed = 0, display = 0;
   const original = game.update.bind(game);
@@ -80,7 +112,8 @@ export function installInspector({ game, stage, startRun, toMenu, getState, devi
     if (display < 0.5) return;
     const info = stage.renderer.info;
     const v = game.sw.vel;
-    stats.textContent = `${getState()} · ${Math.round(frames / elapsed)} fps\n${info.render.calls} draws · ${Math.round(info.render.triangles / 1000)}k triangles\n${info.memory.geometries} geometries · ${info.memory.textures} textures\n${game.snapshot().distance}m · ${game.lives} lives · ${Math.hypot(v.x, v.y).toFixed(1)}m/s`;
+    const sound = game.audio.reaction ? 'Reaction foreground' : game.audio.radioActive ? 'Onam playing' : game.audio.melam ? 'Recorded melam looping' : 'Melam stopped';
+    stats.textContent = `${getState()} · ${Math.round(frames / elapsed)} fps\n${info.render.calls} draws · ${Math.round(info.render.triangles / 1000)}k triangles\n${info.memory.geometries} geometries · ${info.memory.textures} textures\n${game.snapshot().distance}m · ${game.health} HP · ${Math.hypot(v.x, v.y).toFixed(1)}m/s\n${sound}`;
     frames = 0; elapsed = 0; display = 0;
   };
 }

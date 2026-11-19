@@ -1,9 +1,10 @@
 // Procedural Kerala tusker: smooth rope trunk and tail, Pooram finery and the infamous anjaamkaal.
 import * as THREE from 'three';
 import { Rope } from './rope.js';
-import { elephantSkin, contactShadow } from '../world/materials.js';
+import { elephantSkin, elephantTrunk, contactShadow } from '../world/materials.js';
 import { createTusker, tuskerSockets, tuskerSaddle } from './tusker-model.js';
 import { personalityFor } from '../game/personalities.js';
+import { seatedPaappan, sharedFestivalFan, festivalWhisk } from './people.js';
 
 let S = null; // shared geometries/materials, built lazily
 
@@ -67,9 +68,9 @@ function shared() {
     cone: new THREE.ConeGeometry(1.5, 0.6, 18, 1, true),
     ring: new THREE.CylinderGeometry(1.5, 1.5, 0.2, 18, 1, true),
     bangle: new THREE.TorusGeometry(1, 0.3, 6, 14),
-    disc: new THREE.CircleGeometry(1, 20),
-    skin: std('#242826', { bumpMap: elephantSkin(), bumpScale: 0.065 }),
+    skin: std('#37332f', { bumpMap: elephantSkin(), bumpScale: 0.065 }),
     skinBaby: std('#30342f', { bumpMap: elephantSkin(), bumpScale: 0.05 }),
+    trunkSkin: std('#a88f80', { map: elephantTrunk(), bumpMap: elephantSkin(), bumpScale: .05 }),
     earInner: std('#c79a9a'),
     pinkSpot: std('#c9958f'),
     sneezeNose: std('#e05a5a'),
@@ -81,9 +82,6 @@ function shared() {
     anjaamTip: std('#e08a9c', { roughness: 0.5 }),
     gold: new THREE.MeshStandardMaterial({ map: goldTexture(), metalness: 0.75, roughness: 0.35, emissive: '#3a2a00', side: THREE.DoubleSide }),
     goldPlain: new THREE.MeshStandardMaterial({ color: '#f2c230', metalness: 0.8, roughness: 0.3, emissive: '#3a2600' }),
-    mundu: std('#f4efe2'),
-    riderSkin: std('#9c6b46'),
-    peacock: std('#0f9f86', { side: THREE.DoubleSide, emissive: '#052a22' }),
     clothColors: ['#c0392b', '#8e44ad', '#d35400', '#1e8449', '#2e86c1'].map((c) => std(c, { side: THREE.DoubleSide })),
     parasolColors: ['#e74c3c', '#f1c40f', '#9b59b6', '#1abc9c', '#e67e22', '#ff4fa3'].map((c) => std(c, { side: THREE.DoubleSide, roughness: 0.6 })),
     zzz: new THREE.SpriteMaterial({ map: zzzTexture(), transparent: true, depthWrite: false }),
@@ -221,14 +219,15 @@ export class Elephant {
     g.add(this.trunkJoin);
     this.ribbonMat = new THREE.MeshStandardMaterial({ color: this.personality.color, roughness: .85 });
     g.add(mesh(s.cyl, this.ribbonMat, detailed ? -1.77 : -1.5, .55, detailed ? .57 : .65, .32, .1, .32));
-    this.trunk = new Rope(skin, { segments: 20, radial: 8, r0: 0.5, r1: 0.17, shadow: true });
+    const trunkSkin = detailed && variant !== 'baby' ? s.trunkSkin : skin;
+    this.trunk = new Rope(trunkSkin, { segments: 22, radial: 10, r0: 0.47, r1: 0.17, shadow: true });
     g.add(this.trunk.mesh);
     this.nettiRope = null;
     if (fancy) {
-      this.nettiRope = new Rope(s.goldPlain, { segments: 8, radial: 8, r0: 0.57, r1: 0.42 });
+      this.nettiRope = new Rope(s.gold, { segments: 8, radial: 8, r0: 0.51, r1: 0.39, arc: Math.PI * 1.08 });
       g.add(this.nettiRope.mesh);
     }
-    this.trunkTip = mesh(s.low, variant === 'sneezy' ? s.sneezeNose : skin, 0, 0, 0, variant === 'sneezy' ? 0.3 : 0.2);
+    this.trunkTip = mesh(s.low, variant === 'sneezy' ? s.sneezeNose : trunkSkin, 0, 0, 0, variant === 'sneezy' ? 0.3 : 0.2);
     this.trunkBangle = mesh(s.bangle, s.goldPlain, 0, 0, 0, 0.24);
     this.trunkBangle.rotation.x = Math.PI / 2;
     g.add(this.trunkTip, this.trunkBangle);
@@ -252,12 +251,18 @@ export class Elephant {
     }
 
     this.parasol = null;
+    const backY = sockets ? sockets.backY + .025 : 4.1;
+    if (fancy) {
+      this.paappan = seatedPaappan((cloth ?? 1) % 3);
+      this.paappan.position.set(-.48, backY + .10, 0);
+      g.add(this.paappan);
+    }
     if (parasol) {
       const rider = new THREE.Group();
-      const backY = sockets ? sockets.backY + .04 : 4.1;
       rider.position.set(0.4, backY, 0);
-      rider.add(mesh(s.cyl, s.mundu, 0, 0.35, 0, 0.24, 0.7, 0.24));
-      rider.add(mesh(s.sphere, s.riderSkin, 0, 0.9, 0, 0.21));
+      const umbrellaRider = seatedPaappan(1, true);
+      umbrellaRider.position.set(.04, .06, 0);
+      rider.add(umbrellaRider);
       rider.add(mesh(s.cyl, s.goldPlain, 0.15, 1.3, 0, 0.035, 2.0, 0.035));
       const umb = new THREE.Group();
       umb.position.set(0.15, 2.45, 0);
@@ -266,12 +271,13 @@ export class Elephant {
       umb.add(mesh(s.ring, s.goldPlain, 0, -0.35, 0, 1, 1, 1));
       umb.add(mesh(s.sphere, s.goldPlain, 0, 0.38, 0, 0.16));
       rider.add(umb);
-      // second rider with aalavattam (peacock fan) and venchamaram (white whisk)
-      rider.add(mesh(s.cyl, s.mundu, 0.95, 0.3, 0, 0.22, 0.6, 0.22));
-      rider.add(mesh(s.sphere, s.riderSkin, 0.95, 0.78, 0, 0.19));
-      rider.add(mesh(s.disc, s.peacock, 1.15, 1.55, 0.25, 0.5));
-      rider.add(mesh(s.disc, s.goldPlain, 1.15, 1.55, 0.24, 0.58));
-      rider.add(mesh(s.low, s.white, 0.8, 1.25, -0.3, 0.2, 0.32, 0.2));
+      const fanRider = seatedPaappan(2, true);
+      fanRider.position.set(.88, .02, 0);
+      this.fan = sharedFestivalFan();
+      this.fan.position.set(.53, .54, .30);
+      this.whisk = festivalWhisk();
+      this.whisk.position.set(.51, .57, -.28);
+      rider.add(fanRider, this.fan, this.whisk);
       g.add(rider);
       this.parasol = umb;
       this.parasolLocal = new THREE.Vector3(0.55, backY + 2.75, 0);
@@ -339,6 +345,12 @@ export class Elephant {
     const blink = this.variant === 'sleepy' || (p % 3.7) < 0.12 ? 0.15 : 1;
     this.eyes.forEach((e) => { e.scale.y = 0.12 * blink; });
     if (this.parasol) this.parasol.rotation.y += dt * 1.5;
+    if (this.paappan) this.paappan.rotation.z = Math.sin(p * 1.65) * .04;
+    if (this.fan) {
+      this.fan.rotation.z = Math.sin(p * 2.7) * .25;
+      this.fan.rotation.y = Math.sin(p * 2.0) * .26;
+      this.whisk.rotation.z = Math.sin(p * 2.7 + .9) * .41;
+    }
     if (this.zzz) {
       this.zzz.position.y = 5 + ((p * 0.6) % 1) * 0.8;
       this.zzz.material.opacity = 1 - ((p * 0.6) % 1);

@@ -1,4 +1,4 @@
-// Gameplay props: collectibles, monkeys, projectiles, bus, boats, pedestals.
+// Gameplay props: collectibles, monkeys, projectiles, boats, pedestals.
 import * as THREE from 'three';
 
 const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.83, ...extra });
@@ -14,10 +14,6 @@ const M = {
   banana: std('#ffd23f', { emissive: '#4a3a00' }),
   coconut: std('#5a6b2a'),
   rock: std('#7d7466'),
-  busRed: std('#c0282d'),
-  tyre: std('#1a1a1a'),
-  hull: std('#1f1a17'),
-  rower: std('#f4efe2'),
   gold: new THREE.MeshStandardMaterial({ color: '#f2c230', metalness: 0.8, roughness: 0.25, emissive: '#5a3a00' }),
   crown: new THREE.MeshStandardMaterial({ color: '#ff4040', emissive: '#550000' }),
 };
@@ -108,64 +104,6 @@ export function makeMonkey(boss = false) {
   return g;
 }
 
-function busTexture() {
-  const c = document.createElement('canvas');
-  c.width = 1024;
-  c.height = 256;
-  const g = c.getContext('2d');
-  g.fillStyle = '#c0282d';
-  g.fillRect(0, 0, 1024, 256);
-  g.fillStyle = '#f3e3b5';
-  g.fillRect(0, 30, 1024, 90);
-  g.fillStyle = '#2b3d4f';
-  for (let i = 0; i < 9; i++) g.fillRect(30 + i * 108, 40, 88, 70);
-  g.fillStyle = '#f3e3b5';
-  g.font = 'bold 64px Arial Black, sans-serif';
-  g.fillText('KSRTC', 340, 200);
-  g.fillStyle = '#ffd23f';
-  g.fillRect(0, 128, 1024, 10);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-let busMat = null;
-export function makeBus() {
-  busMat ||= new THREE.MeshStandardMaterial({ map: busTexture(), roughness: 0.6 });
-  const g = new THREE.Group();
-  const body = new THREE.Mesh(G.box, [M.busRed, M.busRed, M.busRed, M.busRed, busMat, busMat]);
-  body.scale.set(9, 2.4, 2.4);
-  body.position.y = 1.7;
-  body.castShadow = true;
-  g.add(body);
-  for (const x of [-3, 3]) {
-    for (const z of [1.2, -1.2]) {
-      const w = part(G.cyl, M.tyre, x, 0.5, z, 0.5, 0.3, 0.5);
-      w.rotation.x = Math.PI / 2;
-      g.add(w);
-    }
-  }
-  g.userData.top = 2.9;
-  g.userData.half = 4.5;
-  return g;
-}
-
-export function makeBoat() {
-  const g = new THREE.Group();
-  g.add(part(G.box, M.hull, 0, 0.35, 0, 14, 0.5, 1.2));
-  const stern = part(G.cyl, M.hull, 7.2, 1.6, 0, 0.25, 3, 0.25);
-  stern.rotation.z = -0.5;
-  g.add(stern);
-  g.add(part(G.cyl, M.gold, 8, 3, 0, 0.3, 0.2, 0.3));
-  for (let i = 0; i < 9; i++) {
-    g.add(part(G.cyl, M.rower, -5.5 + i * 1.3, 0.85, 0, 0.18, 0.5, 0.18));
-    g.add(part(G.sphere, M.monkey, -5.5 + i * 1.3, 1.25, 0, 0.15));
-  }
-  g.userData.top = 1.1;
-  g.userData.half = 7;
-  return g;
-}
-
 export function makePedestal(h) {
   const g = new THREE.Group();
   const rock = part(G.dodeca, M.rock, 0, h / 2 - 0.3, 0, 3.4, h / 2 + 0.3, 1.8);
@@ -176,28 +114,11 @@ export function makePedestal(h) {
 
 // ---------- v2 additions ----------
 const M2 = {
-  autoYellow: std('#f4c20d'),
-  autoBlack: std('#1c1c1c'),
   chilli: std('#2fae3a', { emissive: '#0a3a0a' }),
   chilliRed: std('#e02a1f', { emissive: '#4a0500' }),
   porotta: std('#f0d9a8', { emissive: '#3a2a10', roughness: 0.6 }),
   porottaSwirl: std('#c99a55'),
 };
-
-export function makeAuto() {
-  const g = new THREE.Group();
-  g.add(part(G.box, M2.autoBlack, 0, 0.75, 0, 2.4, 0.9, 1.5));
-  g.add(part(G.box, M2.autoYellow, 0.1, 1.5, 0, 2.0, 0.75, 1.45));
-  g.add(part(G.box, M2.autoBlack, -0.95, 1.35, 0, 0.5, 0.5, 1.3));
-  for (const [x, z] of [[-1, 0], [0.8, 0.75], [0.8, -0.75]]) {
-    const w = part(G.cyl, M.tyre, x, 0.32, z, 0.32, 0.22, 0.32);
-    w.rotation.x = Math.PI / 2;
-    g.add(w);
-  }
-  g.userData.top = 1.95;
-  g.userData.half = 1.5;
-  return g;
-}
 
 // Kanthari mulaku: fills the theri meter.
 export function makeChilli() {

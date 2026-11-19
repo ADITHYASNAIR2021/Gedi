@@ -9,28 +9,31 @@ const N2 = new THREE.Vector3();
 const Z = new THREE.Vector3(0, 0, 1);
 
 export class Rope {
-  constructor(material, { segments = 16, radial = 7, r0 = 0.4, r1 = 0.15, shadow = false } = {}) {
+  constructor(material, { segments = 16, radial = 7, r0 = 0.4, r1 = 0.15, shadow = false, arc = Math.PI * 2 } = {}) {
     this.segments = segments;
     this.radial = radial;
     this.r0 = r0;
     this.r1 = r1;
     const rings = segments + 1;
+    const closed = arc === Math.PI * 2;
+    const sides = closed ? radial : radial - 1;
     this.pos = new Float32Array(rings * radial * 3);
     this.nor = new Float32Array(rings * radial * 3);
     const uv = new Float32Array(rings * radial * 2);
     for (let i = 0; i < rings; i++) for (let j = 0; j < radial; j++) {
-      uv[(i * radial + j) * 2] = j / radial;
+      uv[(i * radial + j) * 2] = j / sides;
       uv[(i * radial + j) * 2 + 1] = i / segments;
     }
     this.cos = [];
     this.sin = [];
     for (let j = 0; j < radial; j++) {
-      this.cos.push(Math.cos((j / radial) * Math.PI * 2));
-      this.sin.push(Math.sin((j / radial) * Math.PI * 2));
+      const angle = (j / sides) * arc + (closed ? 0 : (Math.PI - arc) / 2);
+      this.cos.push(Math.cos(angle));
+      this.sin.push(Math.sin(angle));
     }
     const idx = [];
     for (let i = 0; i < segments; i++) {
-      for (let j = 0; j < radial; j++) {
+      for (let j = 0; j < sides; j++) {
         const a = i * radial + j;
         const b = i * radial + ((j + 1) % radial);
         const c = a + radial;

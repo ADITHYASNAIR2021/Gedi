@@ -1,13 +1,19 @@
 // Procedural generator: elephants, pickups, vehicles, boats and banana-throwing monkeys per chapter.
 import { Elephant } from '../entities/elephant.js';
 import {
-  makeFritter, makeChaya, makeChakka, makeChilli, makePorotta, makeMonkey, makeBus, makeAuto, makeBoat, makePedestal,
+  makeFritter, makeChaya, makeChakka, makeChilli, makePorotta, makeMonkey, makePedestal,
 } from '../entities/props.js';
-import { chapterAt, ELEPHANT_NAMES, ELEPHANT_HOMES, pick } from './story.js';
+import { makeBus, makeAuto } from '../entities/vehicles.js';
+import { makeVallam, animateVallam } from '../entities/vallam.js';
+import { chapterAt, chapterStart, ELEPHANT_NAMES, ELEPHANT_HOMES, pick } from './story.js';
+import { AANAS, aanaAt } from './aanas.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const TRUNK_X = 4.5; // the trunk tip sits this far in front of the elephant's centre
 const MAKERS = { fritter: makeFritter, chaya: makeChaya, chakka: makeChakka, mulaku: makeChilli, porotta: makePorotta };
+const albumNames = new Set(AANAS.map(aana => aana.name));
+const genericNames = ELEPHANT_HOMES.flatMap(home => ELEPHANT_NAMES.map(name => `${home} ${name}`))
+  .filter(name => !albumNames.has(name));
 
 export class Level {
   constructor(scene) {
@@ -19,17 +25,22 @@ export class Level {
     this.monkeys = [];
     this.lastTailX = 0;
     this.spawnCount = 0;
+    this.trafficTime = 0;
+    this.featured = new Set();
   }
 
   reset(startX = 0) {
     this.elephants.forEach((e) => this.removeElephant(e));
-    for (const list of [this.items, this.vehicles, this.boats]) list.forEach((o) => this.scene.remove(o.mesh));
+    for (const list of [this.items, this.vehicles]) list.forEach((o) => this.scene.remove(o.mesh));
+    for (const boat of this.boats) this.removeBoat(boat);
     this.elephants = [];
     this.items = [];
     this.vehicles = [];
     this.boats = [];
     this.monkeys = [];
     this.spawnCount = 0;
+    this.trafficTime = 0;
+    this.featured.clear();
     const first = this.addElephant(startX + TRUNK_X, { decorated: true, anjaam: true, name: 'Thiruvambadi Kannan' }, 0);
     this.lastTailX = first.tailAnchor.pos.x;
     return first;
@@ -65,9 +76,14 @@ export class Level {
     else if (r < cfg.baby + cfg.sleepy) variant = 'sleepy';
     else if (r < cfg.baby + cfg.sleepy + cfg.sneezy) variant = 'sneezy';
 
-    const scale = variant === 'baby' ? 0.75 : 1;
     const pooram = index === 0 || index === 4;
-    const decorated = pooram ? Math.random() < 0.9 : Math.random() < 0.25;
+    const featured = aanaAt(index, dist - chapterStart(index), this.featured);
+    if (featured) {
+      this.featured.add(featured.id);
+      variant = 'normal';
+    }
+    const scale = variant === 'baby' ? 0.75 : 1;
+    const decorated = !!featured || (pooram ? Math.random() < 0.9 : Math.random() < 0.25);
     const parasol = variant !== 'baby' && Math.random() < cfg.parasol;
     let pedestal = 0;
     if (cfg.water) pedestal = rand(0.3, 0.5 + cfg.pedestal);
@@ -78,10 +94,11 @@ export class Level {
     const x = trunkX + TRUNK_X * scale;
     const e = this.addElephant(x, {
       variant, decorated, parasol,
-      cloth: Math.floor(Math.random() * 5),
-      name: `${pick(ELEPHANT_HOMES)} ${pick(ELEPHANT_NAMES)}`,
+      cloth: featured?.cloth ?? Math.floor(Math.random() * 5),
+      name: featured?.name ?? pick(genericNames),
       anjaam: Math.random() < cfg.anjaam,
     }, pedestal);
+    e.aana = featured;
     e.sway = Math.random() * cfg.sway;
 
     // pickups: an arc across the gap, sometimes another over the elephant's back
@@ -102,11 +119,9 @@ export class Level {
       const roadRoll = Math.random();
       if (roadRoll < cfg.bus) this.addVehicle(makeBus(), x + rand(15, 30), -rand(2, 5), 'KSRTC RESCUE!');
       else if (roadRoll < cfg.bus + cfg.auto) this.addVehicle(makeAuto(), x + rand(8, 25), -rand(3, 7), 'AUTO CHETTAN SAVE!');
-    } else if (Math.random() < cfg.boat) {
-      const boat = makeBoat();
-      boat.position.set(dist + gap * 0.5, 0, 1.6);
-      this.scene.add(boat);
-      this.boats.push({ mesh: boat, speed: rand(-1.5, 1.5), phase: Math.random() * 6, label: 'VALLAM BOING!' });
+    } else if ((index !== 2 || dist >= chapterStart(2) + 60)
+      && Math.random() < cfg.boat && this.boats.every(b => Math.abs(b.mesh.position.x - dist) > 21)) {
+      this.addBoat(dist + gap * 0.5, -rand(.7, 2.1));
     }
 
     this.lastTailX = e.tailAnchor.pos.x;
@@ -116,7 +131,23 @@ export class Level {
   addVehicle(mesh, x, speed, label) {
     mesh.position.set(x, 0, 3.6);
     this.scene.add(mesh);
-    this.vehicles.push({ mesh, speed, label });
+    const vehicle = { mesh, speed, label, startX: x, previousX: x, previousY: 0 };
+    this.vehicles.push(vehicle);
+    return vehicle;
+  }
+
+  addBoat(x, speed, race = false) {
+    const mesh = makeVallam(race);
+    mesh.position.set(x, 0, 1.6);
+    this.scene.add(mesh);
+    const boat = { mesh, speed, phase: Math.random() * 6, label: 'VALLAM RESCUE!', rescueBonus: race ? 45 : 0 };
+    this.boats.push(boat);
+    return boat;
+  }
+
+  removeBoat(boat) {
+    this.scene.remove(boat.mesh);
+    for (const part of Object.values(boat.mesh.userData.crew)) part.dispose();
   }
 
   placeArc(x0, x1, peak, special) {
@@ -181,22 +212,40 @@ export class Level {
     });
 
     this.vehicles = this.vehicles.filter((v) => {
-      v.mesh.position.x += v.speed * dt;
       if (v.mesh.position.x < behind - 20) {
         this.scene.remove(v.mesh);
         return false;
       }
-      return true;
-    });
-    this.boats = this.boats.filter((b) => {
-      b.mesh.position.x += Math.sin(t * 0.4 + b.phase) * b.speed * dt;
-      b.mesh.position.y = Math.sin(t * 1.5 + b.phase) * 0.1;
-      if (b.mesh.position.x < behind - 20) {
-        this.scene.remove(b.mesh);
-        return false;
+      for (const { rolling, radius } of v.mesh.userData.wheels) {
+        rolling.rotation.z = -(v.mesh.position.x - v.startX) / radius;
       }
       return true;
     });
+    this.boats = this.boats.filter((b) => {
+      if (b.mesh.position.x < behind - 20) {
+        this.removeBoat(b);
+        return false;
+      }
+      b.mesh.visible = Math.abs(b.mesh.position.x - camX) < 66;
+      if (b.mesh.visible) animateVallam(b.mesh, t + b.phase);
+      return true;
+    });
+  }
+
+  stepTraffic(dt) {
+    this.trafficTime += dt;
+    for (const vehicle of this.vehicles) {
+      const { mesh, speed } = vehicle;
+      vehicle.previousX = mesh.position.x;
+      mesh.position.x += speed * dt;
+    }
+    for (const boat of this.boats) {
+      const p = boat.mesh.position;
+      boat.previousX = p.x;
+      boat.previousY = p.y;
+      p.x += boat.speed * dt;
+      p.y = Math.sin(this.trafficTime * 1.5 + boat.phase) * 0.1;
+    }
   }
 
   // Best grabbable anchor around Gedi (prefers the ones ahead).

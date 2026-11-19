@@ -11,8 +11,10 @@ import { Game } from './game/game.js';
 import { TUNING } from './game/swing.js';
 import { Gedi } from './entities/gedi.js';
 import { prepareTusker } from './entities/tusker-model.js';
+import { prepareVehicles } from './entities/vehicles.js';
 import { Hud } from './ui/hud.js';
-import { CHAPTERS, INTRO, CHAPTER_CARDS, VICTORY, GAME_OVER_LINES, fmt, pick } from './game/story.js';
+import { AANAS } from './game/aanas.js';
+import { CHAPTERS, INTRO, CHAPTER_CARDS, KOTTAYAM, VICTORY, GAME_OVER_LINES, fmt, pick } from './game/story.js';
 
 const $ = (id) => document.getElementById(id);
 const INTRO_VERSION = 2;
@@ -34,7 +36,7 @@ try {
   $('boot-message').textContent = 'Your browser could not start 3D graphics. Try enabling hardware acceleration or opening this game in a recent browser.';
   throw error;
 }
-await Promise.all([prepareTusker(!device.quality.shadows), stage.prepareLighting()]);
+await Promise.all([prepareTusker(!device.quality.shadows), stage.prepareLighting(), prepareVehicles()]);
 const env = new Environment(stage.scene, device.quality.propDensity);
 const level = new Level(stage.scene);
 const fx = new Fx(stage.scene);
@@ -83,16 +85,18 @@ function toMenu() {
   state = 'menu';
   hud.setPlaying(false);
   audio.stopMusic();
+  audio.clearReaction();
   game.start({ demo: true });
   refreshMenu();
   hud.show('screen-menu');
 }
 
 async function startRun(chapter = 0) {
-  if (!['menu', 'over'].includes(state)) return;
+  if (!['menu', 'over', 'album'].includes(state)) return;
   state = 'starting';
   clearInput();
   audio.unlock();
+  audio.clearReaction();
   if (save.data.intro !== INTRO_VERSION) {
     state = 'story';
     await hud.story(panels(INTRO));
@@ -108,6 +112,12 @@ async function startRun(chapter = 0) {
 }
 
 // ---------- in-game events ----------
+game.on('aana', (aana) => {
+  if (!save.discoverAana(aana.id)) return;
+  hud.aanaUnlock(aana.name);
+  audio.play('collect', 4);
+});
+
 game.on('chapter', async ({ chapter, caught, victory }) => {
   if (state !== 'play') return;
   state = 'card';
@@ -119,11 +129,15 @@ game.on('chapter', async ({ chapter, caught, victory }) => {
   } else {
     const card = CHAPTER_CARDS[chapter + 1];
     const lead = caught ? '<b>BONK!</b> Kuttappan dropped a banana peel and fled. ' : 'Kuttappan slipped away! ';
-    await hud.story(panels([{ ...card, text: lead + card.text, cta: 'Chase him! ▶' }]));
+    const next = { ...card, text: lead + card.text, cta: 'Chase him! ▶' };
+    await hud.story(panels(chapter === 1 ? [KOTTAYAM, next] : [next]));
   }
   hud.hideScreens();
   game.setHold(true);
   pressed = false;
+  if (!victory && chapter + 2 > save.data.bestChapter) save.set('bestChapter', chapter + 2);
+  const recovered = game.heal(20);
+  if (recovered) game.pop(`RECOVERED +${recovered} HP`, 'gold');
   state = 'play';
 });
 
@@ -300,6 +314,18 @@ $('btn-story').onclick = async () => {
   hud.show('screen-menu');
 };
 $('btn-board').onclick = showBoard;
+$('btn-album').onclick = () => {
+  state = 'album';
+  hud.renderAlbum(AANAS, CHAPTERS, save.data.aanas, Math.max(0, continueChapter()));
+  hud.show('screen-album');
+  $('a-back').focus();
+};
+$('a-back').onclick = () => {
+  state = 'menu';
+  hud.show('screen-menu');
+  $('btn-album').focus();
+};
+$('a-replay').onclick = () => startRun(Number($('a-chapter').value));
 $('b-back').onclick = () => { state = 'menu'; hud.show('screen-menu'); };
 $('btn-pause').onclick = pause;
 $('p-resume').onclick = resume;

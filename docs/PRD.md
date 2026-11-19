@@ -42,10 +42,9 @@ Make a fun, shareable tribute game for Adarshh "Gedi" S Kumar that friends can o
 - The trunk/tail mesh stretches from the elephant to Gedi's hands while held.
 - Elephant variants: normal, **Kuttiyaana** (baby, small, 2× points), **Sleepy** (trunk droops while held), **Sneezy** (launches Gedi after ~0.9 s), **Parasol** (Kudamattam umbrella on top = bounce pad).
 
-### 3.4 Fail / lives
-- Touching ground/water = lose 1 life, respawn hanging on the last elephant grabbed, 2 s invulnerability.
-- Start with 3 lives (max 5). Run ends at 0.
-- **Rescues:** parasol tops, KSRTC bus roofs, snake boats bounce Gedi upward. Chaya shield auto-saves one fall.
+### 3.4 Health and recovery
+- Start with 100 HP. An unshielded ground or water fall costs 35 HP and respawns Gedi on a nearby elephant with 2 seconds of protection. The run ends at 0 HP.
+- **Rescues:** parasol tops, KSRTC roofs and snake boats bounce Gedi upward. An auto canopy gives a faster forward launch. Chaya absorbs one hit or fall.
 
 ### 3.5 Scoring
 - Distance: 2 pts per metre.
@@ -58,14 +57,14 @@ Make a fun, shareable tribute game for Adarshh "Gedi" S Kumar that friends can o
 ### 3.6 Encounters
 | Encounter | Effect |
 |---|---|
-| Monkey banana throw | Bonk: combo reset, velocity halved, dizzy stars |
-| Falling coconut | Same as above |
+| Monkey banana throw | 15 HP damage and a light knockback |
+| Falling coconut | Visible warning, 25 HP damage and a heavier knockback |
 | Parasol (Kudamattam) | Bounce pad |
 | KSRTC bus (land chapters) | Rolling bounce pad on the ground |
 | Snake boat (backwaters) | Bounce pad on the water |
 | Sneezy elephant | Forced launch upward/forward |
 | Chaya glass | One-time fall shield |
-| Chakka (jackfruit) | +1 life |
+| Chakka (jackfruit) | Restores up to 30 HP or awards 25 points at full health |
 | Kuttappan the monkey (chapter end) | Touch him to advance the story |
 
 ### 3.7 Story & progression

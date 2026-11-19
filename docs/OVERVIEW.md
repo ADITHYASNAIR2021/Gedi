@@ -30,8 +30,10 @@ Each chapter ends with Kuttappan taunting Gedi from a palm tree. Swing into him 
 - **Manglish hype callouts:** *PWOLI! · KIDU! · ADIPOLI! · THAKARTHU! · MASS! · ISHTAA!*
 - **Chenda beat bonus ("Thaalam!")** — release on the drum beat for a boost.
 - **Sneezy elephant** — "AACHOO!" blasts Gedi sky-high.
-- **KSRTC bus rescue** — fall onto the red bus roof and bounce back to safety.
-- **Chaya power** — a glass of hot tea gives one free save. **Pazhampori** fritters are coins. **Chakka** (jackfruit) = extra life.
+- **Traffic rescues** give Gedi two ways out. The wide KSRTC roof launches him high. The smaller auto canopy sends him ahead faster.
+- **100 HP.** Bananas take 15 HP, coconuts take 25 HP, and a hard fall takes 35 HP. Chaya shields Gedi from one impact, chakka restores up to 30 HP, and finishing a chapter restores up to 20 HP. Pazhampori earns points.
+- **Athirappilly ambush.** Swing high over Kuttappan's volley or take the passing auto shortcut. Close calls earn points.
+- **Onam Radio.** Chenda dips for a seven-second music break during the chase. Gedi reacts to damage with Aiyooo and replies to selected taunts with Myre when Theri is enabled.
 - **Kuttiyaana** baby elephants — tiny trunks, double points.
 - Optional announcer voice (browser speech) shouting the callouts.
 

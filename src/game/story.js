@@ -27,7 +27,7 @@ export const CHAPTERS = [
     sky: ['#7fa8c9', '#e6eef2'], fog: '#dfe8ec', ground: '#4a9450', water: false, night: false,
     gap: [5, 9], pedestal: 2.2, parasol: 0.15, monkey: 0.25, coconut: 0.1, bus: 0.1, auto: 0.3, boat: 0,
     sleepy: 0.3, sneezy: 0.22, baby: 0.18, sway: 0.7, anjaam: 0.55, kthrow: 0.7,
-    props: ['teahill', 'kurinji', 'chayakada', 'jungle'],
+    props: ['teahill', 'kurinji', 'chayakada'],
   },
   {
     name: 'Pooram Night', place: 'Thrissur · Vedikettu', end: 2000, bpm: 136,
@@ -77,7 +77,7 @@ export const fmt = (text, theri) => text.replace(/\[\[(.*?)\|(.*?)\]\]/g, (_, a,
 
 export const INTRO = [
   {
-    img: '/assets/gedi-boat.jpg',
+    img: '/assets/kerala/pooram.webp', alt: 'Vadakkunnathan Temple entrance in Thrissur',
     title: 'Thrissur. Pooram morning.',
     text: '30 caparisoned tuskers. A million people. Chenda melam warming up. And one certified <b>aanapremi</b> who knows every tusker by name, height and horoscope — <b>Adarshh S Kumar</b>. The gang just calls him <b>GEDI</b>.',
   },
@@ -101,15 +101,15 @@ export const INTRO = [
 export const CHAPTER_CARDS = [
   null,
   {
-    emoji: '🌴💦', title: 'Chapter 2 · Athirappilly Chase',
+    img: '/assets/kerala/athirappilly.webp', alt: 'The Athirappilly waterfall and surrounding forest', title: 'Chapter 2 · Athirappilly Chase',
     text: 'Kuttappan: <i>"Hehehe! You only pulled my tail, Gedi-kutta. The Nettipattam is going on a Kerala tour!"</i><br>Gedi: <i>"[[Poda poori mone|Poda kuranga]]!"</i><br>Into the jungle — his cousins throw bananas and the coconuts are not friendly.',
   },
   {
-    emoji: '🛶🌅', title: 'Chapter 3 · Backwater Bedlam',
+    img: '/assets/kerala/alappuzha.webp', alt: 'Chundan vallams racing on Punnamada Lake', title: 'Chapter 3 · Backwater Bedlam',
     text: 'Kuttappan hijacked a kettuvallam into Vembanad Kayal! The ground is water now.<br>Snake boats will bounce you. And the aanas are bathing, so… the <b>anjaamkaal</b> is very relaxed. 😏',
   },
   {
-    emoji: '🍵⛰️', title: 'Chapter 4 · Munnar Mist',
+    img: '/assets/kerala/munnar.webp', alt: 'Mist rising over the Munnar tea gardens', title: 'Chapter 4 · Munnar Mist',
     text: 'Up in the tea hills it is cold. The elephants are <b>sleepy</b> (droopy trunks) and some are <b>sneezy</b> (AACHOO = free flight).<br>Gedi: <i>"[[Ee myru thanuppu|Enthoru thanuppu]]…"</i> Grab a chaya for a free save.',
   },
   {
@@ -117,6 +117,12 @@ export const CHAPTER_CARDS = [
     text: 'Back in Thrissur. The vedikettu is about to start and Kannan still has a naked forehead.<br><b>Bonk Kuttappan 3 times</b> to make him drop the Nettipattam. All of Thrissur is watching, Gedi!',
   },
 ];
+
+export const KOTTAYAM = {
+  img: '/assets/kerala/thirunakkara.webp', alt: 'Thirunakkara Mahadeva Temple, Kottayam',
+  title: 'Kottayam · Thirunakkara',
+  text: 'Gedi stops outside Thirunakkara Mahadeva Temple just long enough to catch his breath. A boatman points him towards Punnamada. A certain monkey just hitched a ride.',
+};
 
 export const VICTORY = {
   img: '/assets/gedi-dance.jpg',

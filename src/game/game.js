@@ -11,6 +11,12 @@ import { RunPerks } from './perks.js';
 const STEP = 1 / 120;
 const FEET = 1.15 * GEDI_SCALE;
 const RAGE_TIME = 8;
+const MAX_HEALTH = 100;
+const FALL_DAMAGE = 35;
+const HITS = {
+  banana: { damage: 15, carry: 0.82, drop: 3, stun: 0.28, shake: 0.13 },
+  coconut: { damage: 25, carry: 0.63, drop: 5, stun: 0.48, shake: 0.24 },
+};
 const rand = (a, b) => a + Math.random() * (b - a);
 const v3 = new THREE.Vector3();
 
@@ -46,11 +52,12 @@ export class Game {
     const startX = chapterStart(chapter);
     const first = this.level.reset(startX);
     Object.assign(this, {
-      demo, teach, startX, t: 0, time: 0, acc: 0, distance: startX, distPts: 0, bonus: 0, lives: 3, combo: 1,
+      demo, teach, startX, t: 0, time: 0, acc: 0, distance: startX, distPts: 0, bonus: 0, health: MAX_HEALTH, combo: 1,
       shield: false, magnet: 0, invuln: 0, stunned: 0, cooldown: 0, lastReleased: null, current: null, style: null, bounceSpring: null, teaSlow: 0,
       sling: null, sneezeT: 0, fallT: 0, dying: 0, slowmo: 0, bounceCooldown: 0, cfgName: '', fireworkT: 1, coconutT: 2, tauntT: 4,
       kthrowT: 3, replyT: 0, theriPopT: 0, theri: 0, rage: 0, dustT: 0, pendingCard: null, holding: true,
       grabbed: new Set(), tut: { grabs: 0, releases: 0 },
+      radioPlayed: false, ambush: null, coconutWarning: null, vallamSeen: false,
       stats: { elephants: 0, perfects: 0, anjaam: 0, theri: 0, names: [] },
     });
     this.applyBiome(chapterAt(startX), true);
@@ -81,9 +88,10 @@ export class Game {
     const start = chapterStart(ch.index);
     const progressK = ch.encore ? 1 : (this.distance - start) / (ch.cfg.end - start);
     return {
-      score: this.score, distance: Math.floor(this.distance - this.startX), lives: this.lives, combo: this.combo,
+      score: this.score, distance: Math.floor(this.distance - this.startX), health: this.health, combo: this.combo,
       shield: this.shield, magnet: this.magnet > 0, chapterName: ch.cfg.name, progress: progressK,
       beat: this.audio.beatPhase(), theri: this.theri, rage: this.rage > 0,
+      radio: this.audio.radioActive,
       attached: !!this.current, perfect: !!this.current && perfectRelease(this.sw.vel),
       rhythm: this.perks.rhythm, festival: this.perks.level, teaCharge: this.perks.teaCharge,
       teaCombo: this.t < this.perks.teaUntil,
@@ -103,11 +111,14 @@ export class Game {
   bubble(text) { this.pop(text, 'bubble', this.sw.pos, 3.6); }
 
   // Gedi lets one fly (theri, or the family-friendly version).
-  shout() {
-    const word = pick(this.settings.theri ? THERI : CLEAN);
+  shout(recorded = false) {
+    const spicyClip = this.settings.theri && recorded;
+    const word = spicyClip ? 'MYRE!' : pick(this.settings.theri ? THERI : CLEAN);
     this.bubble(word);
     this.stats.theri++;
-    if (!this.demo) this.audio.say(word.toLowerCase().replace(/!/g, ''));
+    if (!this.demo && (!spicyClip || !this.audio.sample?.('myre'))) {
+      this.audio.say(word.toLowerCase().replace(/!/g, ''));
+    }
   }
 
   add(points) { this.bonus += points * (this.rage > 0 ? 2 : 1); }
@@ -118,6 +129,7 @@ export class Game {
     this.stage.setBiome(ch.cfg, instant);
     this.env.setBiome(ch.cfg);
     this.audio.setTempo(ch.cfg.bpm);
+    this.audio.setAmbience?.(ch.cfg);
     if (!instant && !this.demo) this.hud.banner(ch.cfg.name, ch.cfg.place);
   }
 
@@ -145,6 +157,7 @@ export class Game {
     }
     if (this.grabbed.has(anchor.el)) return;
     this.grabbed.add(anchor.el);
+    if (!this.demo && anchor.el.aana) this.emit('aana', anchor.el.aana);
     this.stats.elephants++;
     if (this.stats.names.length < 40) this.stats.names.push(anchor.el.name);
     if (Math.random() < 0.3) this.sfx('trumpet', anchor.el.scale < 1 ? 1.5 : 1);
@@ -272,8 +285,8 @@ export class Game {
   }
 
   // ---------- hazards ----------
-  bonk() {
-    if (this.invuln > 0 || this.stunned > 0) return;
+  bonk(type = 'banana') {
+    if (this.demo || this.invuln > 0 || this.sling || this.fallT > 0 || this.dying > 0) return;
     this.fx.sparkle(new THREE.Vector3(this.sw.pos.x, this.sw.pos.y + 0.8, 1.8));
     if (this.rage > 0) {
       this.add(10);
@@ -287,22 +300,48 @@ export class Game {
       this.invuln = 1;
       return;
     }
-    this.stunned = 1;
+    const hit = HITS[type] || HITS.banana;
+    this.stunned = hit.stun;
+    this.invuln = 0.85;
+    this.sw.vel.x *= hit.carry;
+    this.sw.vel.y -= hit.drop;
+    this.sfx('bonk');
+    this.stage.shake = hit.shake;
+    this.takeDamage(hit.damage);
+    if (this.health > 0) this.addTheri(type === 'coconut' ? 0.38 : 0.26);
+  }
+
+  takeDamage(amount) {
+    const lost = Math.min(this.health, amount);
+    this.health -= lost;
+    this.style = null;
     this.perks.breakRhythm();
     this.audio.setFestival?.(0);
     this.combo = 1;
-    this.sw.vel.x *= 0.4;
-    this.sw.vel.y = Math.min(this.sw.vel.y, 0) - 2;
-    this.sfx('bonk');
-    this.stage.shake = 0.2;
-    this.shout();
-    this.addTheri(0.34);
+    this.stats.theri++;
+    this.pop(`AIYOOO! −${lost} HP`, 'damage');
+    this.audio.sample?.('aiyooo');
+    if (this.health > 0) return;
+    this.detach();
+    this.sling = null;
+    this.bounceSpring = null;
+    this.pendingCard = null;
+    this.acc = 0;
+    this.dying = 1.4;
+    this.sfx('lose');
+    this.audio.stopMusic();
   }
 
-  bounce(vy, vxMin, label) {
+  heal(amount) {
+    const gained = Math.min(amount, MAX_HEALTH - this.health);
+    this.health += gained;
+    return gained;
+  }
+
+  bounce(vy, vxMin, label, roof = null) {
     this.perks.breakRhythm();
     this.audio.setFestival?.(0);
-    this.bounceSpring = { t: 0, vy, vx: Math.max(this.sw.vel.x, vxMin) };
+    this.bounceSpring = { t: 0, vy, vx: Math.max(this.sw.vel.x, vxMin), roof };
     this.sw.vel.y = 0;
     this.gedi.landed?.();
     this.bounceCooldown = 0.22;
@@ -313,7 +352,7 @@ export class Game {
 
   fall() {
     if (this.demo || this.rage > 0 || this.shield) {
-      const label = this.rage > 0 ? 'THERI BOUNCE!' : 'CHAYA SAVE!';
+      const label = this.demo ? '' : this.rage > 0 ? 'RAGE BOUNCE!' : 'CHAYA SAVE!';
       if (this.rage <= 0) this.shield = false;
       this.sw.pos.y = FEET + 0.05;
       this.bounce(17, 8, label);
@@ -322,21 +361,13 @@ export class Game {
     }
     const p = new THREE.Vector3(this.sw.pos.x, 0.2, 1.8);
     this.detach();
-    this.style = null;
-    this.lives -= 1;
-    this.perks.breakRhythm();
-    this.audio.setFestival?.(0);
     this.bounceSpring = null;
-    this.combo = 1;
+    this.acc = 0;
+    this.stunned = 0;
     this.stage.shake = 0.3;
     if (this.cfg.water) { this.fx.splash(p); this.sfx('splash'); } else { this.fx.dust(p); this.sfx('thud'); }
-    this.shout();
-    this.hud.update(this.snapshot());
-    if (this.lives <= 0) {
-      this.dying = 1.4;
-      this.sfx('lose');
-      this.audio.stopMusic();
-    } else {
+    this.takeDamage(FALL_DAMAGE);
+    if (this.health > 0) {
       this.fallT = 0.9;
       this.addTheri(0.5);
     }
@@ -357,12 +388,14 @@ export class Game {
 
     if (this.dying > 0) {
       this.dying -= rawDt;
+      this.level.stepTraffic(dt);
       this.tickVisuals(dt);
       if (this.dying <= 0) this.end();
       return;
     }
     if (this.fallT > 0) {
       this.fallT -= dt;
+      this.level.stepTraffic(dt);
       this.tickVisuals(dt);
       if (this.fallT <= 0) {
         this.hangFrom(this.level.respawnElephant(this.sw.pos.x));
@@ -381,7 +414,9 @@ export class Game {
     this.bounceCooldown = Math.max(0, (this.bounceCooldown || 0) - dt);
     this.tickRage(dt);
 
+    const { x: beforeX, y: beforeY } = this.sw.pos;
     if (this.sling) {
+      this.level.stepTraffic(dt);
       this.tickSling(dt);
     } else {
       this.acc += dt;
@@ -391,7 +426,7 @@ export class Game {
         if (this.fallT > 0 || this.dying > 0 || this.sling) break;
       }
     }
-    this.tickWorld(dt);
+    if (!this.fallT && !this.dying) this.tickWorld(dt, beforeX, beforeY);
     this.tickVisuals(dt);
 
     if (this.pendingCard && this.slowmo <= 0) {
@@ -412,7 +447,9 @@ export class Game {
 
   physicsStep() {
     const sw = this.sw;
+    const previousX = sw.pos.x;
     const previousFeet = sw.pos.y - FEET;
+    this.level.stepTraffic?.(STEP);
     if (this.holding && !this.current) {
       const exclude = this.cooldown > 0 ? this.lastReleased : null;
       const a = this.level.findAnchor(sw.pos.x, sw.pos.y, TUNING.grabRadius, exclude);
@@ -437,7 +474,13 @@ export class Game {
       const bounce = this.bounceSpring;
       bounce.t += STEP;
       if (bounce.t < 0.075) {
-        sw.pos.x += bounce.vx * STEP * 0.6;
+        if (bounce.roof) {
+          const { mesh, previousX } = bounce.roof;
+          sw.pos.x += mesh.position.x - previousX;
+          sw.pos.y = FEET + mesh.position.y + mesh.userData.top;
+        } else {
+          sw.pos.x += bounce.vx * STEP * 0.6;
+        }
         sw.vel.y = 0;
         return;
       }
@@ -461,27 +504,58 @@ export class Game {
       }
       return;
     }
-    if (sw.vel.y < 0 && !this.bounceCooldown) {
+    if (!this.bounceCooldown) {
+      let contact = null;
       for (const e of this.level.elephants) {
         const top = e.parasolTop();
-        if (top && Math.abs(sw.pos.x - top.x) < top.r && previousFeet >= top.y && feet <= top.y) {
-          sw.pos.y = top.y + FEET;
-          this.bounce(15, 6, 'KUDAMATTAM BOING!');
-          return;
-        }
+        if (!top || previousFeet < top.y || feet > top.y || feet >= previousFeet) continue;
+        const time = (previousFeet - top.y) / (previousFeet - feet);
+        if (Math.abs(THREE.MathUtils.lerp(previousX, sw.pos.x, time) - top.x) >= top.r) continue;
+        if (!contact || time < contact.time) contact = { time, surface: top.y };
       }
       for (const list of [this.level.vehicles, this.level.boats]) {
         for (const b of list) {
-          const { top, half } = b.mesh.userData;
-          const surface = top + b.mesh.position.y;
-          if (Math.abs(sw.pos.x - b.mesh.position.x) < half && previousFeet >= surface && feet <= surface) {
-            sw.pos.y = surface + FEET;
-            this.bounce(15, 9, b.label);
-            return;
-          }
+          const { top, half, center = 0 } = b.mesh.userData;
+          const { x, y } = b.mesh.position;
+          const oldX = b.previousX ?? x;
+          const gap = previousFeet - (top + (b.previousY ?? y));
+          const nextGap = feet - (top + y);
+          if (gap < 0 || nextGap > 0 || nextGap >= gap) continue;
+          const time = gap / (gap - nextGap);
+          if (contact && time >= contact.time) continue;
+          const roofX = THREE.MathUtils.lerp(oldX, x, time) + center;
+          if (Math.abs(THREE.MathUtils.lerp(previousX, sw.pos.x, time) - roofX) >= half) continue;
+          contact = { time, surface: top + y, roof: b };
         }
       }
-      if (feet < 1.4) {
+      if (contact) {
+        sw.pos.y = contact.surface + FEET;
+        const roof = contact.roof;
+        if (!roof) {
+          this.bounce(15, 6, 'KUDAMATTAM BOING!');
+        } else {
+          const { launch, kind } = roof.mesh.userData;
+          const lift = launch ? THREE.MathUtils.clamp(launch.up - sw.vel.y * 0.13, launch.up, launch.up + 3) : 15;
+          const forward = launch ? launch.forward : 9;
+          if (roof.ambush) {
+            this.add(60);
+            roof.ambush = false;
+            roof.label = 'AUTO CHETTAN SAVE!';
+            roof.mesh.userData.shortcutMarker.visible = false;
+            this.bounce(lift, forward, 'AUTO SHORTCUT +60', roof);
+          } else if (roof.rescueBonus) {
+            this.add(roof.rescueBonus);
+            roof.rescueBonus = 0;
+            this.bounce(lift, forward, 'VALLAMKALI RESCUE +45', roof);
+          } else {
+            this.bounce(lift, forward, roof.label, roof);
+          }
+          if (kind) this.sfx('horn', kind === 'bus' ? 1 : 1.45);
+        }
+        return;
+      }
+      const slingReach = this.cfg?.water ? .88 : 1.4;
+      if (sw.vel.y < 0 && feet < slingReach) {
         const el = this.level.findAnjaam(sw.pos.x);
         if (el) {
           this.startSling(el);

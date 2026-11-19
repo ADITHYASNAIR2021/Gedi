@@ -28,4 +28,5 @@ The production output is written to `dist/`. Vercel configuration is included.
 The optional global leaderboard requires Upstash Redis environment variables; local scores work without it.
 
 See [game overview](docs/OVERVIEW.md), [verification notes](docs/VERIFICATION.md), and [asset credits](docs/ASSET_CREDITS.md).
+The [Kerala upgrade log](docs/KERALA_UPGRADE.md) tracks implementation, checks and source material.
 Prepared runtime assets are included. Large preparation sources, private original photographs, local environment files, dependencies and build output are excluded.

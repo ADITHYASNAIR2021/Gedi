@@ -1,4 +1,5 @@
 // Local persistence: best scores, run stats, settings.
+import { AANAS } from '../game/aanas.js';
 
 const KEY = import.meta.env?.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).has('inspect')
   ? 'gedi.save.qa' : 'gedi.save.v1';
@@ -9,6 +10,7 @@ const DEFAULTS = {
   bestChapter: 0,
   runs: 0,
   elephants: 0,
+  aanas: {},
   name: '',
   seenIntro: false,
   settings: { sound: true, music: true, voice: true, theri: true },
@@ -19,7 +21,8 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return structuredClone(DEFAULTS);
     const data = JSON.parse(raw);
-    return { ...structuredClone(DEFAULTS), ...data, settings: { ...DEFAULTS.settings, ...data.settings } };
+    const known = Object.fromEntries(AANAS.filter(aana => data.aanas?.[aana.id] === true).map(aana => [aana.id, true]));
+    return { ...structuredClone(DEFAULTS), ...data, aanas: known, settings: { ...DEFAULTS.settings, ...data.settings } };
   } catch {
     return structuredClone(DEFAULTS);
   }
@@ -50,6 +53,13 @@ export const save = {
       state.best = score;
       persist();
     }
+  },
+
+  discoverAana(id) {
+    if (state.aanas[id] || !AANAS.some(aana => aana.id === id)) return false;
+    state.aanas[id] = true;
+    persist();
+    return true;
   },
 
   set(key, value) {

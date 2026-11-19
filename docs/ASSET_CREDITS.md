@@ -25,3 +25,9 @@ From [Poly Haven](https://polyhaven.com/license), whose asset library is CC0:
 Texture maps are compressed to 1K WebP. The HDR sky stays at 1K for lighting. The visible forest panorama uses a separate higher-resolution image; the 1K HDR was visibly blocky when used directly as scenery.
 
 Gedi's supplied face photograph remains a flat alpha cutout. His body, other characters, architecture, foliage, effects and props use game geometry; the complete scene is not photorealistic.
+
+## Vehicle photography and audio
+
+- [Vehicle photo credits](../public/assets/vehicles/credits.html) list the Wikimedia Commons photographers, adaptations and CC BY-SA 3.0 license for the KSRTC and auto textures.
+- [Kerala photo credits](../public/assets/kerala/credits.html) identify the elephant textures, temple roof and landmark photographs. The game exposes both credits pages from the pause menu.
+- The Aiyooo and Myre reactions, the Onam radio clip and the source recording for the chendamelam loop come from the supplied files in `Audio/`.

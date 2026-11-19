@@ -1,9 +1,11 @@
 // Ground + streamed Kerala scenery per biome: temple, pandal, flex boards, pookalam, pulikali,
 // jungle, waterfall, backwaters with cheena vala, Munnar tea hills with neelakurinji.
 import * as THREE from 'three';
-import { chapterAt, FLEX_LINES } from '../game/story.js';
+import { chapterAt, chapterStart, FLEX_LINES } from '../game/story.js';
 import { coconutPalm, ghats, roadsideGrass, batchScenery } from './landscape.js';
 import { photographicMaterial } from './materials.js';
+import { pooramGate, athirappilly, alappuzhaShore, munnarPlantation, updateLandmarks } from './landmarks.js';
+import { chendaPlayer } from '../entities/people.js';
 
 const CHUNK = 40;
 const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...extra });
@@ -13,20 +15,9 @@ const M = {
   leaf: std('#528044', { side: THREE.DoubleSide }),
   leafDark: std('#284f37'),
   coconut: std('#5a6b2a'),
-  templeWall: photographicMaterial('plaster', { color: '#f0e4c9', repeat: [3, 1], normal: false }),
-  templeRoof: photographicMaterial('roof', { color: '#b17d5a', repeat: [4, 2], normal: false }),
-  gopuram: std('#d9c7a0'),
   goldLamp: new THREE.MeshStandardMaterial({ color: '#f2c230', metalness: 0.8, roughness: 0.3, emissive: '#553300' }),
-  flame: new THREE.MeshBasicMaterial({ color: '#ffb02e' }),
-  rock: photographicMaterial('trail', { color: '#8c9189', repeat: [2, 2] }),
-  water: new THREE.MeshBasicMaterial({ color: '#d8f2ff', transparent: true, opacity: 0.85 }),
   hull: std('#5a3a22'),
   thatch: std('#c9a35a'),
-  tea: std('#2f7a3a'),
-  teaLight: std('#4a9a4a'),
-  hillNear: std('#6f9468'),
-  hillFar: std('#9db59a'),
-  cloud: std('#fff7e7', { emissive: '#646962', roughness: 1, transparent: true, opacity: 0.72, depthWrite: false }),
   crowdHead: std('#2a1d16'),
   crowdBody: std('#ffffff'),
   tigerBody: std('#f08a1d'),
@@ -47,12 +38,10 @@ const G = {
   low: new THREE.SphereGeometry(1, 7, 5),
   box: new THREE.BoxGeometry(1, 1, 1),
   cone: new THREE.ConeGeometry(1, 1, 10),
-  hemi: new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2),
   halfCyl: new THREE.CylinderGeometry(1, 1, 1, 12, 1, true, 0, Math.PI),
   disc: new THREE.CircleGeometry(1, 28),
   plane: new THREE.PlaneGeometry(1, 1),
   net: new THREE.PlaneGeometry(1, 1, 8, 8),
-  roof: new THREE.CylinderGeometry(0.35, 1, 1, 4, 1),
 };
 
 const CROWD_COLORS = ['#f4efe2', '#ae5348', '#c7a653', '#6d9294', '#ba7779', '#718c68', '#ded4bc', '#c98e68'];
@@ -194,55 +183,37 @@ function jungleTree(g, x, z, h) {
   for (let i = 0; i < 3; i++) add(g, G.sphere, i % 2 ? M.leafDark : M.leaf, x + (i - 1) * h * 0.12, h * (0.55 + i * 0.14), z, h * (0.3 - i * 0.05), h * 0.24, h * (0.3 - i * 0.05));
 }
 
-function temple(g, x, z) {
-  add(g, G.box, M.rock, x, 0.3, z, 27, 0.6, 7);
-  add(g, G.box, M.templeWall, x, 2, z, 25, 3.4, 5);
-  for (let i = -5; i <= 5; i++) {
-    add(g, G.box, M.pandal, x + i * 2.15, 2, z + 2.55, 0.13, 3.3, 0.18);
-    if (i % 2 === 0) add(g, G.box, M.pandal, x + i * 2.15, 1.6, z + 2.57, 0.9, 1.9, 0.1);
-  }
-  const roof = add(g, G.roof, M.templeRoof, x, 4.5, z, 19.5, 2.1, 5.7);
-  roof.rotation.y = Math.PI / 4; roof.castShadow = true;
-  for (let i = 0; i < 3; i++) {
-    add(g, G.box, M.templeWall, x, 5.8 + i * 2.5, z, 7 - i * 1.5, 1.6, 4 - i * 0.7);
-    const tier = add(g, G.roof, M.templeRoof, x, 7 + i * 2.5, z, 7 - i * 1.4, 1.6, 4.6 - i * 0.7);
-    tier.rotation.y = Math.PI / 4; tier.castShadow = true;
-  }
-  for (let i = -2; i <= 2; i++) add(g, G.low, M.goldLamp, x + i * 0.55, 13.2, z, 0.16, 0.32, 0.16);
-  // deepastambham: the tiered brass lamp tower
-  for (const dx of [-9, 9]) {
-    add(g, G.cyl, M.goldLamp, x + dx, 2.5, z + 3, 0.12, 5, 0.12);
-    for (let i = 0; i < 5; i++) {
-      add(g, G.cyl, M.goldLamp, x + dx, 1.2 + i * 0.9, z + 3, 0.75 - i * 0.12, 0.08, 0.75 - i * 0.12);
-      add(g, G.low, M.flame, x + dx + 0.6 - i * 0.1, 1.38 + i * 0.9, z + 3, 0.1, 0.18, 0.1);
-      add(g, G.low, M.flame, x + dx - 0.6 + i * 0.1, 1.38 + i * 0.9, z + 3, 0.1, 0.18, 0.1);
-    }
-  }
-}
-
-function crowd(g, x0, z, tigers) {
-  const n = 54;
+function crowd(g, x0, z, tigers, density, drummers) {
+  const n = density < .75 ? 36 : 60;
   const bodies = new THREE.InstancedMesh(G.sphere, M.crowdBody, n);
-  const heads = new THREE.InstancedMesh(G.low, M.crowdHead, n);
+  const heads = new THREE.InstancedMesh(G.low, M.crowdBody, n);
   const mundus = new THREE.InstancedMesh(G.cyl, M.crowdBody, n);
-  const arms = new THREE.InstancedMesh(G.cyl, M.crowdHead, n * 2);
+  const arms = new THREE.InstancedMesh(G.cyl, M.crowdBody, n * 2);
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const c = new THREE.Color();
+  const axis = new THREE.Vector3(0, 0, 1);
+  const skinColors = ['#845a44', '#a27151', '#66462f', '#bd8b65'];
   for (let i = 0; i < n; i++) {
     const x = x0 + Math.random() * CHUNK;
     const zz = z - Math.random() * 6;
     const height = .85 + Math.random() * .25;
-    m.compose(new THREE.Vector3(x, 1.15 * height, zz), q, new THREE.Vector3(.32, .45 * height, .19));
+    const cheer = i % 9 < 3;
+    q.identity();
+    m.compose(new THREE.Vector3(x, 1.15 * height, zz), q, new THREE.Vector3(.25 + (i % 5) * .019, .42 * height, .18));
     bodies.setMatrixAt(i, m);
     bodies.setColorAt(i, c.set(CROWD_COLORS[i % CROWD_COLORS.length]));
-    m.compose(new THREE.Vector3(x, 1.85 * height, zz), q, new THREE.Vector3(.21, .25, .21));
+    m.compose(new THREE.Vector3(x, 1.75 * height, zz), q, new THREE.Vector3(.16, .21, .16));
     heads.setMatrixAt(i, m);
-    m.compose(new THREE.Vector3(x, .42 * height, zz), q, new THREE.Vector3(.28, .83 * height, .2));
+    heads.setColorAt(i, c.set(skinColors[i % skinColors.length]));
+    m.compose(new THREE.Vector3(x, .42 * height, zz), q, new THREE.Vector3(.25, .83 * height, .19));
     mundus.setMatrixAt(i, m);
     for (const side of [-1, 1]) {
-      m.compose(new THREE.Vector3(x + side * .34, .97 * height, zz), q, new THREE.Vector3(.06, .67 * height, .06));
-      arms.setMatrixAt(i * 2 + (side + 1) / 2, m);
+      q.setFromAxisAngle(axis, side * (cheer ? -.81 : .14 + i % 3 * .10));
+      m.compose(new THREE.Vector3(x + side * (cheer ? .39 : .30), (cheer ? 1.46 : 1.03) * height, zz), q, new THREE.Vector3(.055, .65 * height, .057));
+      const at = i * 2 + (side + 1) / 2;
+      arms.setMatrixAt(at, m);
+      arms.setColorAt(at, c.set(skinColors[i % skinColors.length]));
     }
   }
   const wave = new THREE.Group();
@@ -261,6 +232,16 @@ function crowd(g, x0, z, tigers) {
   }
   g.add(wave);
   g.userData.crowd = wave;
+  if (drummers) {
+    g.userData.drummers = Array.from({ length: density < .75 ? 2 : 3 }, (_, i) => {
+      const player = chendaPlayer();
+      player.g.userData.dynamic = true;
+      player.g.position.set(x0 + 16 + i * 1.48, 0, z + 1.25 - i * .28);
+      player.g.rotation.y = -.23 + i * .58;
+      g.add(player.g);
+      return player.arms;
+    });
+  }
 }
 
 function flex(g, x, z, i) {
@@ -301,31 +282,6 @@ function pandal(g, x, z) {
   g.add(bulbs);
 }
 
-function waterfall(g, x, z) {
-  for (let i = 0; i < 7; i++) add(g, G.low, M.rock, x - 13 + i * 4.5, 10 + Math.sin(i) * 2, z - 2, 5, 15 + Math.sin(i * 3) * 3, 4);
-  g.userData.fall = add(g, G.plane, waterfallMaterial(), x, 12, z + 2.2, 9, 24, 1);
-  g.userData.fall.userData.dynamic = true;
-  add(g, G.sphere, M.water, x, 0.5, z + 1, 6, 1.2, 3);
-}
-
-let waterfallMat;
-function waterfallMaterial() {
-  if (waterfallMat) return waterfallMat;
-  const map = canvasTexture(128, 256, ctx => {
-    ctx.clearRect(0, 0, 128, 256);
-    for (let i = 0; i < 150; i++) {
-      const x = Math.random() * 128;
-      const alpha = 0.15 + Math.random() * 0.55;
-      ctx.fillStyle = `rgba(224,246,241,${alpha})`;
-      ctx.fillRect(x, Math.random() * 256, 1 + Math.random() * 5, 20 + Math.random() * 130);
-    }
-  });
-  map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.repeat.set(2, 2);
-  waterfallMat = new THREE.MeshStandardMaterial({ map, color: '#e7fffa', roughness: 0.3, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
-  return waterfallMat;
-}
-
 function houseboat(g, x, z) {
   const b = new THREE.Group();
   b.userData.dynamic = true;
@@ -354,11 +310,6 @@ function lilies(g, x0) {
     pad.rotation.x = -Math.PI / 2;
     if (i % 3 === 0) add(g, G.low, M.lilyFlower, x, 0.18, z, 0.2, 0.16, 0.2);
   }
-}
-
-function teaHill(g, x, z, r) {
-  add(g, G.hemi, Math.random() > 0.5 ? M.tea : M.teaLight, x, -r * 0.35, z, r, r * 0.7, r * 0.8);
-  for (let i = 0; i < 5; i++) add(g, G.box, M.leafDark, x, r * 0.05 + i * r * 0.1, z + r * 0.45 - i * r * 0.1, r * (1.7 - i * 0.28), 0.15, 0.4);
 }
 
 function kurinji(g, x0) {
@@ -438,28 +389,30 @@ export class Environment {
   buildChunk(k) {
     const g = new THREE.Group();
     const x0 = k * CHUNK;
-    const { cfg, index } = chapterAt(Math.max(0, x0));
+    const { cfg, index } = chapterAt(Math.max(0, x0 + CHUNK / 2));
     const props = cfg.props;
     const d = this.density;
     const has = (name) => props.includes(name);
     const every = (n, offset = 0) => ((k % n) + n) % n === offset;
 
-    if (has('temple') && (k === -1 || every(5, 2))) temple(g, x0 + 20, -15);
-    if (has('crowd')) crowd(g, x0, -6.5, has('pulikali') && every(2) ? 2 : 0);
+    if (has('temple') && (k === 0 || every(6, 2) || k === Math.ceil(chapterStart(4) / CHUNK))) pooramGate(g, x0 + 18, -19, cfg.night);
+    if (has('crowd')) crowd(g, x0, -6.5, has('pulikali') && every(2) ? 2 : 0, d, every(3));
     if (has('flex') && every(2, 1)) flex(g, x0 + 20, -13.5, ((k % 4) + 4) % 4);
     if (has('pookalam') && every(3)) pookalam(g, x0 + 10, -3.6);
     if (has('pandal') && every(4, 3)) pandal(g, x0 + 20, -22);
     if (has('palm')) for (let i = 0; i < Math.round(5 * d); i++) coconutPalm(g, x0 + Math.random() * CHUNK, -10 - Math.random() * 25, 8 + Math.random() * 6);
     if (has('jungle')) for (let i = 0; i < Math.round((index === 3 ? 3 : 7) * d); i++) jungleTree(g, x0 + Math.random() * CHUNK, -8 - Math.random() * 30, 6 + Math.random() * 7);
-    if (has('waterfall') && every(4)) waterfall(g, x0 + 20, -50);
+    const fallsChunk = Math.floor((chapterStart(1) + 46) / CHUNK);
+    if (has('waterfall') && (k === fallsChunk || (index === 5 && every(6)))) athirappilly(g, x0 + 20, -37);
     if (has('chayakada') && every(3, 1)) stall(g, x0 + 12, -9, every(2));
     if (has('houseboat') && Math.random() < 0.8) houseboat(g, x0 + Math.random() * CHUNK, -16 - Math.random() * 14);
     if (has('cheenavala') && every(2)) cheenaVala(g, x0 + 24, -11);
     if (has('lily')) lilies(g, x0);
-    if (has('teahill')) for (let i = 0; i < 3; i++) teaHill(g, x0 + Math.random() * CHUNK, -30 - Math.random() * 40, 10 + Math.random() * 10);
+    if (has('teahill')) munnarPlantation(g, x0, CHUNK, d, every(3, 2));
     if (has('kurinji')) kurinji(g, x0);
 
-    if (has('teahill') || cfg.water) ghats(g, x0, CHUNK);
+    if (has('teahill')) ghats(g, x0, CHUNK);
+    if (cfg.water) alappuzhaShore(g, x0, every(3, 1));
     if (!cfg.water) roadsideGrass(g, x0, d);
     if (has('temple') && every(2)) {
       const flagPoints = [];
@@ -484,7 +437,6 @@ export class Environment {
     // Quantised origin keeps the water pattern attached to the world as the camera moves.
     this.water.position.x = Math.floor(camX / 100) * 100;
     this.waterUniforms.time.value = t;
-    if (waterfallMat) waterfallMat.map.offset.y = t * 0.65;
     this.groundMat.map.offset.x = (camX / 700) * 220;
     this.groundMat.normalMap.offset.x = this.groundMat.map.offset.x;
     this.road.position.x = camX;
@@ -500,8 +452,11 @@ export class Environment {
         continue;
       }
       if (g.userData.bob) g.userData.bob.forEach((b, i) => { b.position.y = Math.sin(t * 1.3 + i) * 0.15; b.rotation.z = Math.sin(t + i) * 0.02; });
-      if (g.userData.fall) g.userData.fall.material.opacity = 0.75 + Math.sin(t * 8) * 0.1;
+      updateLandmarks(g, t);
       if (g.userData.crowd) g.userData.crowd.position.y = Math.sin(t * 2) * 0.018;
+      g.userData.drummers?.forEach((arms, i) => arms.forEach((arm, j) => {
+        arm.rotation.x = -.14 + Math.sin(t * 8.6 + i * .12 + Math.PI * j) * .53;
+      }));
     }
   }
 

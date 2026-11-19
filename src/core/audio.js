@@ -1,4 +1,28 @@
-// Fully procedural audio: chenda melam music, SFX and an announcer voice.
+// Chenda melam, procedural effects, and Gedi's recorded reactions.
+
+const CLIPS = {
+  aiyooo: { url: new URL('../../Audio/aiyooooo.m4a', import.meta.url), gain: 1.12, cooldown: 1.4 },
+  myre: { url: new URL('../../Audio/Myre.m4a', import.meta.url), gain: 1.45, cooldown: 10 },
+  onam: { url: new URL('../../Audio/mrkolayali-sayip-onam.mp3', import.meta.url), gain: 1 },
+  melam: { url: '/assets/audio/chendamelam-loop.mp3', gain: 0.82 },
+};
+
+const MELAM_LENGTH = 22.548;
+// Accented transients in the prepared recording, measured from the loop cut.
+const MELAM_BEATS = [
+  .032, .651, 1.279, 1.918, 2.556, 3.185, 3.813, 4.452, 5.071,
+  5.704, 6.333, 6.951, 7.590, 8.218, 8.842, 9.471, 10.104, 10.718,
+  11.341, 11.970, 12.599, 13.217, 13.836, 14.464, 15.098, 15.716, 16.340,
+  16.964, 17.602, 18.216, 18.834, 19.458, 20.096, 20.710, 21.324, 21.947,
+];
+
+export function recordedBeat(elapsed, length = MELAM_LENGTH) {
+  const t = ((elapsed % length) + length) % length;
+  const i = MELAM_BEATS.findIndex(beat => beat > t);
+  const previous = i > 0 ? MELAM_BEATS[i - 1] : MELAM_BEATS[MELAM_BEATS.length - 1] - (i < 0 ? 0 : length);
+  const next = i < 0 ? MELAM_BEATS[0] + length : MELAM_BEATS[i];
+  return { offset: Math.min(t - previous, next - t), phase: (t - previous) / (next - previous) };
+}
 
 const STEPS = 16;
 const CHENDA = [1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1];
@@ -26,6 +50,9 @@ export class GameAudio {
     this.musicOn = false;
     this.lastSay = 0;
     this.festival = 0;
+    this.clips = {};
+    this.lastSample = {};
+    this.ambienceProfile = [600, 0.12];
   }
 
   unlock() {
@@ -41,28 +68,219 @@ export class GameAudio {
     const comp = ctx.createDynamicsCompressor();
     this.master.connect(comp).connect(ctx.destination);
     this.music = ctx.createGain();
+    this.recording = ctx.createGain();
+    this.bed = ctx.createGain();
+    this.bed.gain.value = 0;
+    this.musicVolume = ctx.createGain();
+    this.soundVolume = ctx.createGain();
     this.sfx = ctx.createGain();
-    this.music.connect(this.master);
-    this.sfx.connect(this.master);
+    this.ambience = ctx.createGain();
+    this.ambience.gain.value = 0;
+    this.music.connect(this.bed);
+    this.recording.connect(this.bed);
+    this.bed.connect(this.musicVolume).connect(this.master);
+    this.sfx.connect(this.soundVolume).connect(this.master);
+    this.ambience.connect(this.soundVolume);
     this.applySettings();
     const len = ctx.sampleRate * 2;
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.timer = setInterval(() => this.schedule(), 25);
+    for (const [name, clip] of Object.entries(CLIPS)) {
+      fetch(clip.url)
+        .then((response) => response.ok ? response.arrayBuffer() : Promise.reject())
+        .then((bytes) => ctx.decodeAudioData(bytes))
+        .then((buffer) => {
+          this.clips[name] = buffer;
+          if (name === 'melam' && this.musicOn) this.startMelam();
+        })
+        .catch(() => {});
+    }
   }
 
   applySettings() {
     if (!this.ctx) return;
-    this.music.gain.value = this.settings.music ? 0.55 : 0;
-    this.sfx.gain.value = this.settings.sound ? 1 : 0;
+    this.musicVolume.gain.value = this.settings.music ? 0.55 : 0;
+    this.soundVolume.gain.value = this.settings.sound ? 1 : 0;
+    if (!this.settings.sound || !this.settings.voice) this.clearReaction();
   }
 
   setTempo(bpm) { this.bpm = bpm; }
   setFestival(level) { this.festival = Math.max(0, Math.min(3, level)); }
-  startMusic() { this.musicOn = true; if (this.ctx) this.nextTime = this.ctx.currentTime + 0.05; }
-  stopMusic() { this.musicOn = false; }
-  pause() { this.ctx?.suspend(); }
+  startMusic() {
+    this.stopMusic();
+    this.musicOn = true;
+    this.beats = [];
+    this.step = this.bar = 0;
+    this.lastSample = {};
+    if (!this.ctx) return;
+    const t = this.now;
+    this.music.gain.setValueAtTime(1, t);
+    this.nextTime = t + 0.05;
+    this.startMelam();
+    this.startAmbience();
+    this.mix(0.06);
+  }
+
+  stopMusic() {
+    this.musicOn = false;
+    if (!this.ctx) return;
+    const t = this.now;
+    this.radio?.source?.stop(t);
+    this.radio = null;
+    this.melam?.stop(t);
+    this.melam = null;
+    this.air?.stop(t);
+    this.air = null;
+    this.airFilter = null;
+    this.mix(0.04);
+  }
+
+  startMelam() {
+    if (this.melam || !this.clips.melam) return;
+    const t = this.now;
+    const source = this.ctx.createBufferSource();
+    source.buffer = this.clips.melam;
+    source.loop = true;
+    source.loopEnd = Math.min(MELAM_LENGTH, source.buffer.duration);
+    this.melamStart = t + 0.045;
+    this.melam = source;
+    source.connect(this.recording);
+    this.recording.gain.cancelScheduledValues(t);
+    this.recording.gain.setValueAtTime(0, t);
+    this.recording.gain.linearRampToValueAtTime(CLIPS.melam.gain, t + 0.2);
+    this.fade(this.music.gain, 0, 0.035);
+    source.start(this.melamStart);
+  }
+
+  setAmbience(cfg) {
+    this.ambienceProfile = cfg.water ? [300, .16] : cfg.props.includes('waterfall') ? [850, .26]
+      : cfg.props.includes('teahill') ? [420, .095] : [630, .10];
+    if (this.airFilter) {
+      this.fade(this.airFilter.frequency, this.ambienceProfile[0], 0.2);
+      this.mix(0.15);
+    }
+  }
+
+  startAmbience() {
+    const source = this.ctx.createBufferSource();
+    source.buffer = this.noise;
+    source.loop = true;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = this.ambienceProfile[0];
+    source.connect(filter).connect(this.ambience);
+    this.air = source;
+    this.airFilter = filter;
+    source.start();
+  }
+
+  fade(parameter, target, time) {
+    parameter.cancelScheduledValues(this.now);
+    parameter.setTargetAtTime(target, this.now, time);
+  }
+
+  mix(time) {
+    const voice = !!(this.reaction || this.speech);
+    const bed = !this.musicOn ? 0 : voice ? 0.09 : this.radio ? 0.075 : 1;
+    this.fade(this.bed.gain, bed, time);
+    this.fade(this.sfx.gain, voice ? 0.30 : 1, time);
+    this.fade(this.ambience.gain, this.musicOn ? this.ambienceProfile[1] * (voice ? 0.1 : 1) : 0, time);
+  }
+
+  sample(name) {
+    const clip = CLIPS[name];
+    const buffer = this.clips[name];
+    if (!buffer || !this.settings.sound || !this.settings.voice || (name === 'myre' && !this.settings.theri)) return false;
+    const t = this.now;
+    if (t - (this.lastSample[name] ?? -Infinity) < clip.cooldown) return true;
+    if (this.reaction && name === 'myre') return true;
+    this.reaction?.stop(t + 0.012);
+    this.cancelSpeech();
+    this.pauseRadio();
+    const source = this.ctx.createBufferSource();
+    const gain = this.ctx.createGain();
+    gain.gain.value = clip.gain;
+    source.buffer = buffer;
+    source.connect(gain).connect(this.soundVolume);
+    source.onended = () => {
+      if (this.reaction !== source) return;
+      this.reaction = null;
+      this.resumeRadio();
+      this.mix(0.14);
+    };
+    this.reaction = source;
+    this.lastSample[name] = t;
+    this.mix(0.015);
+    source.start(t + 0.05);
+    return true;
+  }
+
+  clearReaction() {
+    this.reaction?.stop();
+    this.reaction = null;
+    this.cancelSpeech();
+    if (this.ctx) {
+      this.resumeRadio();
+      this.mix(0.1);
+    }
+  }
+
+  cancelSpeech() {
+    if (!this.speech) return;
+    this.speech = null;
+    speechSynthesis.cancel();
+  }
+
+  get radioActive() { return !!this.radio; }
+
+  playRadio() {
+    if (!this.clips.onam || !this.musicOn || !this.settings.music || this.radio || this.reaction || this.speech) return false;
+    this.radio = { offset: 0, source: null };
+    this.resumeRadio();
+    this.mix(0.09);
+    return true;
+  }
+
+  pauseRadio() {
+    const radio = this.radio;
+    if (!radio?.source) return;
+    const stopAt = this.now + 0.028;
+    this.fade(radio.fade.gain, 0, 0.007);
+    radio.source.stop(stopAt);
+    radio.offset = Math.min(this.clips.onam.duration, radio.offset + Math.max(0, stopAt - radio.startedAt));
+    radio.source = null;
+  }
+
+  resumeRadio() {
+    const radio = this.radio;
+    if (!radio || radio.source || this.reaction || this.speech) return;
+    const t = this.now;
+    const buffer = this.clips.onam;
+    const left = buffer.duration - radio.offset;
+    if (left <= 0.035) { this.radio = null; return; }
+    const end = t + left;
+    const source = this.ctx.createBufferSource();
+    const fade = this.ctx.createGain();
+    source.buffer = buffer;
+    source.connect(fade).connect(this.musicVolume);
+    fade.gain.setValueAtTime(0, t);
+    fade.gain.linearRampToValueAtTime(CLIPS.onam.gain, t + Math.min(0.27, left * 0.35));
+    fade.gain.setValueAtTime(CLIPS.onam.gain, end - Math.min(0.40, left * 0.35));
+    fade.gain.linearRampToValueAtTime(0, end);
+    Object.assign(radio, { source, fade, startedAt: t });
+    source.onended = () => {
+      if (this.radio?.source !== source) return;
+      this.radio = null;
+      this.mix(0.15);
+    };
+    source.start(t, radio.offset);
+  }
+  pause() {
+    if (this.speech) this.clearReaction();
+    this.ctx?.suspend();
+  }
   resume() { this.ctx?.resume(); }
 
   get now() { return this.ctx ? this.ctx.currentTime : 0; }
@@ -71,6 +289,7 @@ export class GameAudio {
   beatOffset() {
     if (!this.ctx || !this.musicOn) return Infinity;
     const t = this.ctx.currentTime;
+    if (this.melam && t >= this.melamStart) return recordedBeat(t - this.melamStart, this.melam.loopEnd).offset;
     let best = Infinity;
     for (const b of this.beats) best = Math.min(best, Math.abs(b - t));
     return best;
@@ -80,13 +299,14 @@ export class GameAudio {
   beatPhase() {
     if (!this.ctx || !this.musicOn) return 1;
     const t = this.ctx.currentTime;
+    if (this.melam && t >= this.melamStart) return recordedBeat(t - this.melamStart, this.melam.loopEnd).phase;
     const past = this.beats.filter((b) => b <= t);
     if (!past.length) return 1;
     return Math.min(1, (t - past[past.length - 1]) / (60 / this.bpm));
   }
 
   schedule() {
-    if (!this.ctx || !this.musicOn) return;
+    if (!this.ctx || !this.musicOn || this.melam) return;
     const ahead = this.ctx.currentTime + 0.12;
     const stepDur = 60 / this.bpm / 4;
     if (this.nextTime < this.ctx.currentTime - 0.2) this.nextTime = this.ctx.currentTime + 0.02;
@@ -306,6 +526,16 @@ export class GameAudio {
     this.tone(t, { type: 'sine', from: 180, to: 720, dur: 0.18, peak: 0.35 });
   }
 
+  sfx_horn(t, pitch = 1.4) {
+    this.tone(t, { type: 'triangle', from: 218 * pitch, to: 208 * pitch, dur: 0.17, peak: 0.16 });
+    this.tone(t, { type: 'triangle', from: 324 * pitch, to: 310 * pitch, dur: 0.14, peak: 0.085 });
+    this.tone(t + 0.19, { type: 'triangle', from: 241 * pitch, to: 218 * pitch, dur: 0.14, peak: 0.12 });
+  }
+
+  sfx_toss(t) {
+    this.noiseHit(t, { freq: 2100, q: 1.5, peak: 0.11, decay: 0.18 });
+  }
+
   sfx_sneeze(t) {
     this.tone(t, { type: 'sawtooth', from: 300, to: 500, dur: 0.25, peak: 0.06 });
     const f = this.noiseHit(t + 0.3, { freq: 2500, q: 0.6, peak: 0.5, attack: 0.01, decay: 0.4 });
@@ -364,17 +594,27 @@ export class GameAudio {
   }
 
   say(text, force = false) {
-    if (!this.settings.voice || !this.settings.sound || !('speechSynthesis' in window)) return;
+    if (!this.settings.voice || !this.settings.sound || this.reaction || this.radio || !('speechSynthesis' in window)) return;
     const now = performance.now();
-    if (!force && now - this.lastSay < 2500) return;
+    if (!force && (this.speech || now - this.lastSay < 2500)) return;
     this.lastSay = now;
+    this.cancelSpeech();
     const u = new SpeechSynthesisUtterance(text);
     const voices = speechSynthesis.getVoices();
     u.voice = voices.find((v) => /en-IN/i.test(v.lang)) || voices.find((v) => /^en/i.test(v.lang)) || null;
     u.rate = 1.15;
     u.pitch = 1.25;
     u.volume = 0.9;
-    speechSynthesis.cancel();
+    this.speech = u;
+    u.onend = u.onerror = () => {
+      if (this.speech !== u) return;
+      this.speech = null;
+      if (this.ctx) {
+        this.resumeRadio();
+        this.mix(0.13);
+      }
+    };
+    if (this.ctx) this.mix(0.012);
     speechSynthesis.speak(u);
   }
 }

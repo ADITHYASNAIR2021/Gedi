@@ -20,29 +20,26 @@ export function photographicMaterial(name, { repeat = [1, 1], color = '#ffffff',
     normalScale: new THREE.Vector2(.65, .65), roughness });
 }
 
-let skinMap, shadowMap;
+let skinMap, trunkMap, shadowMap;
 export function elephantSkin() {
-  if (skinMap) return skinMap;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#888888'; ctx.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 6000; i++) {
-    const gray = 90 + Math.floor(Math.random() * 90);
-    ctx.fillStyle = `rgb(${gray},${gray},${gray})`;
-    ctx.fillRect(Math.random() * 256, Math.random() * 256, 1.5, 1.5);
+  if (!skinMap) {
+    skinMap = new THREE.TextureLoader().load('/assets/kerala/elephant-skin.webp');
+    skinMap.wrapS = skinMap.wrapT = THREE.MirroredRepeatWrapping;
+    skinMap.repeat.set(3, 2);
+    skinMap.anisotropy = 4;
   }
-  ctx.strokeStyle = '#636363'; ctx.lineWidth = 0.7;
-  for (let i = 0; i < 55; i++) {
-    const y = Math.random() * 256;
-    ctx.beginPath(); ctx.moveTo(0, y);
-    for (let x = 0; x <= 256; x += 16) ctx.lineTo(x, y + Math.sin(x * 0.05 + i) * 3);
-    ctx.stroke();
-  }
-  skinMap = new THREE.CanvasTexture(canvas);
-  skinMap.wrapS = skinMap.wrapT = THREE.RepeatWrapping;
-  skinMap.repeat.set(3, 2);
   return skinMap;
+}
+
+export function elephantTrunk() {
+  if (!trunkMap) {
+    trunkMap = new THREE.TextureLoader().load('/assets/kerala/trunk-speckle.webp');
+    trunkMap.colorSpace = THREE.SRGBColorSpace;
+    trunkMap.wrapS = trunkMap.wrapT = THREE.MirroredRepeatWrapping;
+    trunkMap.repeat.set(2, 2);
+    trunkMap.anisotropy = 4;
+  }
+  return trunkMap;
 }
 
 export function contactShadow(width, depth) {
