@@ -8,7 +8,8 @@ export class Hud {
   constructor() {
     this.el = {
       hud: $('hud'), score: $('h-score'), dist: $('h-dist'), best: $('h-best'), chapter: $('h-chapter'),
-      progress: $('h-progress'), health: $('h-health'), healthPanel: $('health-panel'), healthMeter: $('h-health-meter'),
+      progress: $('h-progress'), chapterMeter: $('h-chapter-meter'), routeDetail: $('h-route-detail'),
+      health: $('h-health'), healthPanel: $('health-panel'), healthMeter: $('h-health-meter'),
       combo: $('h-combo'), shield: $('h-shield'), magnet: $('h-magnet'),
       drum: $('h-drum'), musicMode: $('music-mode'), theri: $('h-theri-fill'),
       popups: $('popups'), banner: $('banner'), hint: $('hint'),
@@ -94,8 +95,17 @@ export class Hud {
     if (L.score !== s.score) this.el.score.textContent = L.score = s.score;
     if (L.distance !== s.distance) this.el.dist.textContent = L.distance = s.distance;
     if (L.chapter !== s.chapterName) this.el.chapter.textContent = L.chapter = s.chapterName;
-    const pct = Math.round(Math.min(1, Math.max(0, s.progress)) * 100);
-    if (L.pct !== pct) { this.el.progress.style.width = `${pct}%`; L.pct = pct; }
+    const pct = Math.round(Math.min(1, Math.max(0, s.progress)) * 1000) / 10;
+    if (L.pct !== pct) {
+      this.el.progress.style.width = `${pct}%`;
+      this.el.chapterMeter.setAttribute('aria-valuenow', pct);
+      L.pct = pct;
+    }
+    if (L.objective !== s.objective) {
+      this.el.routeDetail.textContent = s.objective;
+      this.el.chapterMeter.setAttribute('aria-valuetext', s.objective);
+      L.objective = s.objective;
+    }
     if (L.health !== s.health) {
       const { health, healthPanel, healthMeter } = this.el;
       health.textContent = s.health;

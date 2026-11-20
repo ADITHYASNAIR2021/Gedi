@@ -39,7 +39,9 @@ html, body {
 .chapter { font-weight: 700; font-size: 15px; text-shadow: 0 2px 0 var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bar { position: relative; height: 8px; background: rgba(0,0,0,.35); border-radius: 8px; margin-top: 4px; border: 2px solid rgba(255,255,255,.5); }
 .bar-end { position: absolute; right: -12px; top: -9px; font-size: 18px; }
-#h-progress { height: 100%; width: 0; border-radius: 8px; background: linear-gradient(90deg, var(--gold), #ff7b00); transition: width .2s; }
+#h-progress { position: relative; height: 100%; width: 0; border-radius: 8px; background: linear-gradient(90deg, var(--gold), #ff7b00); }
+.bar-player { position: absolute; right: -4px; top: 50%; width: 8px; height: 8px; transform: translateY(-50%); border: 1px solid #74562b; border-radius: 50%; background: #fff5cb; }
+.route-detail { margin-top: 5px; color: #fff0c7; font: 600 10px system-ui,sans-serif; font-variant-numeric: tabular-nums; text-shadow: 0 1px 4px #08180e; }
 .hud-right { position: absolute; right: 16px; top: calc(10px + var(--safe-t)); display: flex; gap: 10px; align-items: center; }
 .icon-btn { pointer-events: auto; width: 40px; height: 40px; border-radius: 12px; border: 2px solid var(--paper); background: var(--card); color: var(--paper); font-size: 14px; font-weight: 800; cursor: pointer; }
 .hud-bottom { position: absolute; left: 16px; bottom: calc(14px + var(--safe-b)); display: flex; gap: 12px; align-items: center; }
@@ -350,6 +352,13 @@ body.screen-open #touch-controls { display: none; }
 .pop.damage { color: #ffd1ad; font-size: clamp(18px, 2.6vw, 30px); }
 .pop.warning { color: #ffe2a1; font-size: clamp(15px, 2vw, 22px); }
 .photo-credit { display: inline-block; margin-top: 12px; color: var(--muted); font-size: 12px; text-underline-offset: 3px; }
+#btn-encore { color: #fada90; }
+.mode-actions { display: flex; gap: 8px; }
+.mode-actions .btn { flex: 1; min-width: 0; }
+@media (max-height: 650px) and (orientation: landscape) {
+  #festival-hud { top: calc(63px + var(--safe-t)); }
+  .route-detail { font-size: 9px; }
+}
 #aana-unlock {
   position: fixed;
   z-index: 5;

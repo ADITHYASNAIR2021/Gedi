@@ -1,7 +1,7 @@
 // Ground + streamed Kerala scenery per biome: temple, pandal, flex boards, pookalam, pulikali,
 // jungle, waterfall, backwaters with cheena vala, Munnar tea hills with neelakurinji.
 import * as THREE from 'three';
-import { chapterAt, chapterStart, FLEX_LINES } from '../game/story.js';
+import { Route, chapterStart, FLEX_LINES } from '../game/story.js';
 import { coconutPalm, ghats, roadsideGrass, batchScenery } from './landscape.js';
 import { photographicMaterial } from './materials.js';
 import { pooramGate, athirappilly, alappuzhaShore, munnarPlantation, updateLandmarks } from './landmarks.js';
@@ -334,8 +334,9 @@ function stall(g, x, z, toddy) {
 }
 
 export class Environment {
-  constructor(scene, density = 1) {
+  constructor(scene, density = 1, route = new Route()) {
     this.scene = scene;
+    this.route = route;
     this.density = density;
     this.chunks = new Map();
     this.trailMat = photographicMaterial('trail', { repeat: [220, 110] });
@@ -386,10 +387,11 @@ export class Environment {
     this.groundMat.metalness = cfg.water ? 0.35 : 0;
   }
 
-  buildChunk(k) {
+  buildChunk(k, chapter) {
     const g = new THREE.Group();
     const x0 = k * CHUNK;
-    const { cfg, index } = chapterAt(Math.max(0, x0 + CHUNK / 2));
+    const { cfg, region, encore } = chapter;
+    g.userData.routeKey = chapter.key;
     const props = cfg.props;
     const d = this.density;
     const has = (name) => props.includes(name);
@@ -401,9 +403,9 @@ export class Environment {
     if (has('pookalam') && every(3)) pookalam(g, x0 + 10, -3.6);
     if (has('pandal') && every(4, 3)) pandal(g, x0 + 20, -22);
     if (has('palm')) for (let i = 0; i < Math.round(5 * d); i++) coconutPalm(g, x0 + Math.random() * CHUNK, -10 - Math.random() * 25, 8 + Math.random() * 6);
-    if (has('jungle')) for (let i = 0; i < Math.round((index === 3 ? 3 : 7) * d); i++) jungleTree(g, x0 + Math.random() * CHUNK, -8 - Math.random() * 30, 6 + Math.random() * 7);
-    const fallsChunk = Math.floor((chapterStart(1) + 46) / CHUNK);
-    if (has('waterfall') && (k === fallsChunk || (index === 5 && every(6)))) athirappilly(g, x0 + 20, -37);
+    if (has('jungle')) for (let i = 0; i < Math.round((region === 3 ? 3 : 7) * d); i++) jungleTree(g, x0 + Math.random() * CHUNK, -8 - Math.random() * 30, 6 + Math.random() * 7);
+    const fallsChunk = Math.floor((chapter.start + 46) / CHUNK);
+    if (has('waterfall') && (k === fallsChunk || (encore && every(6)))) athirappilly(g, x0 + 20, -37);
     if (has('chayakada') && every(3, 1)) stall(g, x0 + 12, -9, every(2));
     if (has('houseboat') && Math.random() < 0.8) houseboat(g, x0 + Math.random() * CHUNK, -16 - Math.random() * 14);
     if (has('cheenavala') && every(2)) cheenaVala(g, x0 + 24, -11);
@@ -444,7 +446,13 @@ export class Environment {
     this.groundMat.color.lerp(this.groundTarget, 1 - Math.exp(-dt * 1.2));
     const from = Math.floor((camX - 70) / CHUNK);
     const to = Math.floor((camX + 150) / CHUNK);
-    for (let k = from; k <= to; k++) if (!this.chunks.has(k)) this.chunks.set(k, this.buildChunk(k));
+    for (let k = from; k <= to; k++) {
+      const chapter = this.route.at(Math.max(0, k * CHUNK + CHUNK / 2));
+      const cached = this.chunks.get(k);
+      if (cached?.userData.routeKey === chapter.key) continue;
+      if (cached) this.dropChunk(cached);
+      this.chunks.set(k, this.buildChunk(k, chapter));
+    }
     for (const [k, g] of this.chunks) {
       if (k < from - 1 || k > to + 2) {
         this.dropChunk(g);

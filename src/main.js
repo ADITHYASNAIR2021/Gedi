@@ -14,7 +14,7 @@ import { prepareTusker } from './entities/tusker-model.js';
 import { prepareVehicles } from './entities/vehicles.js';
 import { Hud } from './ui/hud.js';
 import { AANAS } from './game/aanas.js';
-import { CHAPTERS, INTRO, CHAPTER_CARDS, KOTTAYAM, VICTORY, GAME_OVER_LINES, fmt, pick } from './game/story.js';
+import { Route, CHAPTERS, ENCORE, INTRO, CHAPTER_CARDS, KOTTAYAM, VICTORY, GAME_OVER_LINES, fmt, pick } from './game/story.js';
 
 const $ = (id) => document.getElementById(id);
 const INTRO_VERSION = 2;
@@ -37,13 +37,14 @@ try {
   throw error;
 }
 await Promise.all([prepareTusker(!device.quality.shadows), stage.prepareLighting(), prepareVehicles()]);
-const env = new Environment(stage.scene, device.quality.propDensity);
-const level = new Level(stage.scene);
+const route = new Route();
+const env = new Environment(stage.scene, device.quality.propDensity, route);
+const level = new Level(stage.scene, route);
 const fx = new Fx(stage.scene);
 const gedi = new Gedi();
 stage.scene.add(gedi.group, gedi.contact);
 const hud = new Hud();
-const game = new Game({ stage, env, level, fx, audio, hud, gedi, settings, touch: device.touch });
+const game = new Game({ stage, env, level, route, fx, audio, hud, gedi, settings, touch: device.touch });
 
 let state = 'menu';
 let lastRun = null;
@@ -76,6 +77,7 @@ function refreshMenu() {
   const cont = $('btn-continue');
   cont.classList.toggle('hidden', d.bestChapter < 2);
   if (d.bestChapter >= 2) cont.textContent = `Continue · Ch ${continueChapter() + 1} ${CHAPTERS[continueChapter()].name}`;
+  $('btn-encore').classList.toggle('hidden', !d.encoreUnlocked && d.bestChapter <= ENCORE);
   hud.setBest(d.best);
   hud.setTheriIcon(settings.theri);
 }
@@ -104,11 +106,11 @@ async function startRun(chapter = 0) {
   }
   hud.hideScreens();
   hud.setPlaying(true);
-  game.start({ chapter, teach: save.data.runs < 3 });
+  game.start({ chapter, teach: chapter !== ENCORE && save.data.runs < 3 });
   state = 'play';
   pressed = false;
   audio.play('trumpet');
-  hud.banner(CHAPTERS[chapter].name, CHAPTERS[chapter].place);
+  hud.banner(game.cfg.name, game.cfg.place);
 }
 
 // ---------- in-game events ----------
@@ -121,8 +123,11 @@ game.on('aana', (aana) => {
 game.on('chapter', async ({ chapter, caught, victory }) => {
   if (state !== 'play') return;
   state = 'card';
+  clearInput();
   hud.hint(null);
+  if (!victory && game.chapter.index + 1 > save.data.bestChapter) save.set('bestChapter', game.chapter.index + 1);
   if (victory) {
+    save.set('encoreUnlocked', true);
     audio.play('fanfare');
     audio.say('Gedi got the Nettipattam! Pwoli!', true);
     await hud.story(panels([{ ...VICTORY, cta: 'Encore! ▶' }]));
@@ -133,9 +138,9 @@ game.on('chapter', async ({ chapter, caught, victory }) => {
     await hud.story(panels(chapter === 1 ? [KOTTAYAM, next] : [next]));
   }
   hud.hideScreens();
+  clearInput();
   game.setHold(true);
-  pressed = false;
-  if (!victory && chapter + 2 > save.data.bestChapter) save.set('bestChapter', chapter + 2);
+  hud.banner(game.cfg.name, game.cfg.place);
   const recovered = game.heal(20);
   if (recovered) game.pop(`RECOVERED +${recovered} HP`, 'gold');
   state = 'play';
@@ -155,7 +160,7 @@ game.on('over', (run) => {
   $('o-newbest').classList.toggle('hidden', !isBest);
   $('o-stats').innerHTML = [
     ['Distance', `${run.distance} m`],
-    ['Chapter', run.chapter > 5 ? 'Encore' : run.chapter],
+    ['Chapter', run.chapter > ENCORE ? 'Encore' : run.chapter],
     ['Elephants', run.elephants],
     ['Pwoli releases', run.perfects],
     ['Chaya combos', run.teaCombos || 0],
@@ -166,8 +171,8 @@ game.on('over', (run) => {
   const names = [...new Set(run.names)].slice(0, 6);
   $('o-album').innerHTML = names.length ? `Aanas you rode: <b>${names.join(', ')}</b>${run.elephants > names.length ? ' …' : ''}` : '';
   // retry from the chapter you reached; a fresh run stays one tap away
-  const retryChapter = Math.min(run.chapter, CHAPTERS.length) - 1;
-  $('o-retry').textContent = retryChapter > 0 ? `Retry Chapter ${retryChapter + 1}` : 'Again!';
+  const retryChapter = run.chapter - 1;
+  $('o-retry').textContent = retryChapter === ENCORE ? 'Retry Encore' : retryChapter > 0 ? `Retry Chapter ${retryChapter + 1}` : 'Again!';
   $('o-retry').onclick = () => startRun(retryChapter);
   $('o-new').classList.toggle('hidden', retryChapter === 0);
   $('o-msg').textContent = '';
@@ -305,6 +310,7 @@ $('c').addEventListener('webglcontextlost', (e) => {
 
 $('btn-play').onclick = () => startRun(0);
 $('btn-continue').onclick = () => startRun(continueChapter());
+$('btn-encore').onclick = () => startRun(ENCORE);
 $('btn-story').onclick = async () => {
   audio.unlock();
   state = 'story';
@@ -352,19 +358,35 @@ stage.resize();
 
 let prev = performance.now();
 let frameAverage = 1 / 60;
-let qualityFrames = 0;
+let slowRenderTime = 0;
 function frame(now) {
-  const dt = Math.min((now - prev) / 1000, 0.1);
+  const elapsed = (now - prev) / 1000;
+  const dt = Math.min(elapsed, 0.1);
   prev = now;
-  // Reduce fill rate only after sustained slow rendering, never during loading spikes.
-  if (!document.hidden && dt < 0.1 && (state === 'play' || state === 'menu')) {
-    frameAverage += (dt - frameAverage) * 0.025;
-    qualityFrames++;
-    if (qualityFrames > 240 && frameAverage > 1 / 36 && stage.renderer.getPixelRatio() > 1) {
-      stage.renderer.setPixelRatio(Math.max(1, stage.renderer.getPixelRatio() - 0.2));
-      stage.resize();
-      qualityFrames = 0;
+  // Keep the default graphics until several seconds of sustained slow rendering.
+  if (!document.hidden && (state === 'play' || state === 'menu')) {
+    const sample = Math.min(elapsed, 0.25);
+    frameAverage += (sample - frameAverage) * (1 - Math.exp(-sample * 2));
+    const renderer = stage.renderer;
+    const ratio = renderer.getPixelRatio();
+    const slow = frameAverage > 1 / 36;
+    const severe = frameAverage > 1 / 24;
+    slowRenderTime = slow ? slowRenderTime + sample : 0;
+    if (slowRenderTime >= 5) {
+      if (ratio > 1) {
+        renderer.setPixelRatio(Math.max(1, ratio - 0.2));
+        stage.resize();
+      } else if (severe && renderer.shadowMap.enabled) {
+        renderer.shadowMap.enabled = false;
+        stage.sun.castShadow = false;
+      } else if (severe && ratio > 0.8) {
+        renderer.setPixelRatio(0.8);
+        stage.resize();
+      }
+      slowRenderTime = 0;
     }
+  } else {
+    slowRenderTime = 0;
   }
   if (state === 'menu' || state === 'board' || state === 'story' || state === 'play') game.update(dt);
   stage.render();

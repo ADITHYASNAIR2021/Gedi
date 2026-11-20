@@ -40,26 +40,29 @@ export const CHAPTERS = [
 
 export const ENCORE_LENGTH = 500;
 const LAST = CHAPTERS.length - 1;
-
-// Story state that outlives a single frame: Encore only starts once the Nettipattam is recovered.
-export const progress = { victory: false, victoryX: 0 };
+export const ENCORE = CHAPTERS.length;
 
 export function chapterStart(index) {
   return index <= 0 ? 0 : CHAPTERS[Math.min(index, CHAPTERS.length) - 1].end;
 }
 
-// Chapter config for any distance. Index 5 is Encore: biomes cycle and get harder.
-export function chapterAt(distance) {
-  for (let i = 0; i < CHAPTERS.length; i++) {
-    if (distance < CHAPTERS[i].end) return { index: i, cfg: CHAPTERS[i], encore: false };
-  }
-  if (!progress.victory) return { index: LAST, cfg: CHAPTERS[LAST], encore: false };
-  const loop = Math.floor(Math.max(0, distance - progress.victoryX) / ENCORE_LENGTH);
-  const base = CHAPTERS[loop % CHAPTERS.length];
+const storyRoute = CHAPTERS.map((cfg, index) => ({
+  key: `story-${index}`, index, region: index, start: chapterStart(index), end: cfg.end, cfg, encore: false,
+}));
+
+function encoreLeg(loop, origin) {
+  const region = loop % CHAPTERS.length;
+  const base = CHAPTERS[region];
   const hard = Math.min(1 + loop * 0.06, 1.35);
+  const start = origin + loop * ENCORE_LENGTH;
   return {
-    index: CHAPTERS.length,
+    key: `encore-${loop}`,
+    index: ENCORE,
+    region,
+    start,
+    end: start + ENCORE_LENGTH,
     encore: true,
+    leg: loop + 1,
     cfg: {
       ...base,
       name: `Encore · ${base.name}`,
@@ -70,6 +73,34 @@ export function chapterAt(distance) {
       kthrow: 0,
     },
   };
+}
+
+export class Route {
+  constructor() { this.reset(0); }
+
+  reset(chapter) {
+    this.encoreStart = chapter === ENCORE ? chapterStart(ENCORE) : null;
+    this.legs = [];
+  }
+
+  startEncore(distance) {
+    this.encoreStart = distance;
+    this.legs = [];
+  }
+
+  at(distance) {
+    if (this.encoreStart !== null && distance >= this.encoreStart) {
+      const loop = Math.floor((distance - this.encoreStart) / ENCORE_LENGTH);
+      return this.legs[loop] ??= encoreLeg(loop, this.encoreStart);
+    }
+    return storyRoute.find(chapter => distance < chapter.end) ?? storyRoute[LAST];
+  }
+}
+
+export function routeProgress(chapter, distance) {
+  const length = chapter.end - chapter.start;
+  const travelled = Math.max(0, Math.min(length, distance - chapter.start));
+  return { progress: travelled / length, travelled: Math.floor(travelled), length: Math.round(length) };
 }
 
 // "[[spicy|clean]]" picks a side depending on the Theri toggle.

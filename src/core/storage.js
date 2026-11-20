@@ -8,6 +8,7 @@ const DEFAULTS = {
   best: 0,
   bestDistance: 0,
   bestChapter: 0,
+  encoreUnlocked: false,
   runs: 0,
   elephants: 0,
   aanas: {},

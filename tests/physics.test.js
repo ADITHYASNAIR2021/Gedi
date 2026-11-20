@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Swinger, TUNING, perfectRelease, launchVelocity } from '../src/game/swing.js';
 import { Game } from '../src/game/game.js';
-import { CHAPTERS, chapterAt, chapterStart, progress } from '../src/game/story.js';
+import { CHAPTERS, ENCORE, Route, chapterStart, routeProgress } from '../src/game/story.js';
 import { Kuttappan } from '../src/game/kuttappan.js';
 import { Fx } from '../src/world/fx.js';
 import * as THREE from 'three';
@@ -113,13 +113,27 @@ test('30, 60 and 120fps feed the same fixed-step swing', () => {
   for (const fps of [30, 60]) assert.deepEqual(simulate(fps), reference);
 });
 
-test('every chapter retry starts in its own biome, finale waits for victory', () => {
-  progress.victory = false;
-  CHAPTERS.forEach((_, i) => assert.equal(chapterAt(chapterStart(i)).index, i));
-  assert.equal(chapterAt(2500).index, 4);
-  progress.victory = true; progress.victoryX = 2000;
-  assert.equal(chapterAt(2100).encore, true);
-  progress.victory = false;
+test('chapter starts, early victory and Encore leg breaks resolve to the same route for the world and meter', () => {
+  const route = new Route();
+  for (const [i, cfg] of CHAPTERS.entries()) {
+    route.reset(i);
+    const chapter = route.at(chapterStart(i));
+    assert.equal(chapter.cfg, cfg);
+    assert.equal(routeProgress(chapter, chapterStart(i)).progress, 0);
+  }
+  assert.equal(route.at(2500).index, ENCORE - 1);
+  route.startEncore(1880);
+  assert.equal(route.at(1879).index, ENCORE - 1);
+  const first = route.at(1880);
+  assert.equal(first.region, 0);
+  assert.equal(routeProgress(first, 2130).progress, .5);
+  const second = route.at(2380);
+  assert.equal(second.region, 1);
+  assert.equal(second.leg, 2);
+  assert.equal(routeProgress(second, 2380).progress, 0);
+  route.reset(ENCORE);
+  assert.equal(route.at(chapterStart(ENCORE)).leg, 1);
+  assert.equal(new Route().at(2380).encore, false);
 });
 
 test('boss catches advance normal chapters; the finale needs three distinct hits', () => {
@@ -138,6 +152,18 @@ test('boss catches advance normal chapters; the finale needs three distinct hits
     }
     assert.equal(boss.active, false);
   }
+});
+
+test('a fast sweep through Kuttappan counts as a bonk even when neither endpoint touches', () => {
+  const scene = new THREE.Scene();
+  const group = new THREE.Group(); scene.add(group);
+  const boss = new Kuttappan(scene);
+  boss.reset(0, ENCORE - 1);
+  boss.el = { group };
+  boss.state = 'sit';
+  const hit = boss.update(1 / 30, 0, { x: 1, y: 5.1 }, 12, {}, -6, 5.1);
+  assert.equal(hit.type, 'hit');
+  assert.equal(hit.hits, 1);
 });
 
 test('pooled particles use one draw object and fully expire', () => {

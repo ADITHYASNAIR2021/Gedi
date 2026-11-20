@@ -5,7 +5,7 @@ import {
 } from '../entities/props.js';
 import { makeBus, makeAuto } from '../entities/vehicles.js';
 import { makeVallam, animateVallam } from '../entities/vallam.js';
-import { chapterAt, chapterStart, ELEPHANT_NAMES, ELEPHANT_HOMES, pick } from './story.js';
+import { Route, chapterStart, ELEPHANT_NAMES, ELEPHANT_HOMES, pick } from './story.js';
 import { AANAS, aanaAt } from './aanas.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -16,8 +16,9 @@ const genericNames = ELEPHANT_HOMES.flatMap(home => ELEPHANT_NAMES.map(name => `
   .filter(name => !albumNames.has(name));
 
 export class Level {
-  constructor(scene) {
+  constructor(scene, route = new Route()) {
     this.scene = scene;
+    this.route = route;
     this.elephants = [];
     this.items = [];
     this.vehicles = [];
@@ -68,7 +69,7 @@ export class Level {
 
   spawnNext() {
     const dist = this.lastTailX;
-    const { cfg, index } = chapterAt(Math.max(0, dist));
+    const { cfg, index, region } = this.route.at(Math.max(0, dist));
 
     let variant = 'normal';
     const r = Math.random();
@@ -76,7 +77,7 @@ export class Level {
     else if (r < cfg.baby + cfg.sleepy) variant = 'sleepy';
     else if (r < cfg.baby + cfg.sleepy + cfg.sneezy) variant = 'sneezy';
 
-    const pooram = index === 0 || index === 4;
+    const pooram = region === 0 || region === 4;
     const featured = aanaAt(index, dist - chapterStart(index), this.featured);
     if (featured) {
       this.featured.add(featured.id);
@@ -143,6 +144,26 @@ export class Level {
     const boat = { mesh, speed, phase: Math.random() * 6, label: 'VALLAM RESCUE!', rescueBonus: race ? 45 : 0 };
     this.boats.push(boat);
     return boat;
+  }
+
+  refreshAhead(x) {
+    // Keep the immediate landing area when the finale changes the route ahead.
+    const edge = x + 8;
+    this.elephants = this.elephants.filter(el => {
+      if (el.group.position.x <= edge || el.held) return true;
+      this.removeElephant(el);
+      return false;
+    });
+    this.lastTailX = Math.max(x, ...this.elephants.map(el => el.tailAnchor.pos.x));
+    for (const key of ['items', 'vehicles', 'boats']) {
+      this[key] = this[key].filter(item => {
+        if (item.mesh.position.x <= edge) return true;
+        if (key === 'boats') this.removeBoat(item);
+        else this.scene.remove(item.mesh);
+        return false;
+      });
+    }
+    this.monkeys = this.monkeys.filter(monkey => this.elephants.includes(monkey.el));
   }
 
   removeBoat(boat) {
@@ -279,8 +300,11 @@ export class Level {
     return null;
   }
 
-  respawnElephant(x) {
-    return this.elephants.find((e) => e.trunkAnchor.pos.x > x - 12 && e.variant !== 'sneezy') || this.elephants[this.elephants.length - 1];
+  respawnElephant(x, chapter) {
+    const safe = this.elephants.filter(e => e.variant !== 'sneezy' && this.route.at(e.group.position.x).key === chapter.key);
+    return safe.reduce((best, e) => !best || Math.abs(e.trunkAnchor.pos.x - x) < Math.abs(best.trunkAnchor.pos.x - x) ? e : best, null)
+      ?? this.elephants.find(e => e.trunkAnchor.pos.x >= x - 8)
+      ?? this.elephants[this.elephants.length - 1];
   }
 
   // Height of whatever Kuttappan would be running on at x.

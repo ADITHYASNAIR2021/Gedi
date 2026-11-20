@@ -29,7 +29,8 @@ export class Kuttappan {
     this.chapter = chapter;
     this.hits = 0;
     this.need = chapter === FINALE ? 3 : 1;
-    this.sitX = CHAPTERS[chapter].end - (chapter === FINALE ? 130 : 14);
+    this.firstPerch = CHAPTERS[chapter].end - (chapter === FINALE ? 130 : 35);
+    this.sitX = this.firstPerch;
     this.x = x;
     this.baseY = 4;
     this.el = null;
@@ -38,7 +39,7 @@ export class Kuttappan {
   }
 
   // Returns null, or one of: {type:'hit'|'caught'|'escaped'|'dodged'}
-  update(dt, t, gedi, lead, level) {
+  update(dt, t, gedi, lead, level, beforeX = gedi.x, beforeY = gedi.y) {
     if (this.state === 'gone') return null;
 
     if (this.state === 'run') {
@@ -69,7 +70,11 @@ export class Kuttappan {
     this.pos.set(v.x, v.y + Math.abs(Math.sin(t * 5)) * 0.35, v.z + 0.4);
     this.mesh.rotation.set(0, Math.sin(t * 3) * 0.5, 0);
 
-    if (Math.hypot(gedi.x - this.pos.x, gedi.y - (this.pos.y + 0.6)) < 2.8) {
+    const dx = gedi.x - beforeX, dy = gedi.y - beforeY;
+    const rx = beforeX - this.pos.x, ry = beforeY - (this.pos.y + 0.6);
+    const lengthSq = dx * dx + dy * dy;
+    const closest = lengthSq ? THREE.MathUtils.clamp(-(rx * dx + ry * dy) / lengthSq, 0, 1) : 0;
+    if (Math.hypot(rx + dx * closest, ry + dy * closest) < 2.8) {
       this.hits++;
       if (this.hits >= this.need) {
         this.state = 'gone';
@@ -88,7 +93,7 @@ export class Kuttappan {
         return { type: 'escaped', chapter: this.chapter };
       }
       this.state = 'run';
-      this.sitX = gedi.x + 32;
+      this.sitX = gedi.x + 26;
       this.x = gedi.x + 4;
       return { type: 'dodged' };
     }

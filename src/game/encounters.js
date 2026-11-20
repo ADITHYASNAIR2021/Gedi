@@ -1,10 +1,10 @@
 // Encounter logic mixed into Game: pickups, monkeys, coconuts, projectiles, Kuttappan and fireworks.
 import * as THREE from 'three';
-import { chapterAt, chapterStart, progress, CALLOUTS, TAUNTS, pick } from './story.js';
+import { ENCORE, chapterStart, CALLOUTS, TAUNTS, pick } from './story.js';
 import { makeBanana, makeCoconut } from '../entities/props.js';
 import { makeAuto } from '../entities/vehicles.js';
 
-const FINALE = 4;
+const FINALE = ENCORE - 1;
 const AMBUSH_AT = chapterStart(1) + 63;
 const rand = (a, b) => a + Math.random() * (b - a);
 const v3 = new THREE.Vector3();
@@ -47,12 +47,12 @@ export const Encounters = {
     const sw = this.sw;
     const gx = sw.pos.x;
     const gy = sw.pos.y;
-    if (gx > this.distance) {
-      this.distPts += (gx - this.distance) * 2 * (this.rage > 0 ? 2 : 1);
-      this.distance = gx;
+    this.recordDistance();
+    const ch = this.route.at(this.distance);
+    if (ch.key !== this.chapter.key) {
+      this.changeChapter(ch);
+      if (this.pendingCard) return;
     }
-    const ch = chapterAt(this.distance);
-    if (ch.cfg.name !== this.cfgName) this.applyBiome(ch);
     this.tickChase(dt, ch);
 
     for (const it of this.level.items) {
@@ -130,7 +130,8 @@ export const Encounters = {
     });
     if (this.dying) return;
 
-    this.tickKuttappan(dt, gx);
+    this.tickKuttappan(dt, gx, beforeX, beforeY);
+    if (this.pendingCard) return;
 
     if (this.cfg.night) {
       this.fireworkT -= dt;
@@ -176,11 +177,11 @@ export const Encounters = {
     this.throwAt(x, y, 2.7);
   },
 
-  tickKuttappan(dt, gx) {
+  tickKuttappan(dt, gx, beforeX, beforeY) {
     const k = this.kutt;
     const lead = this.stage.viewHalfWidth() * 0.7 + 4;
-    const ev = k.update(dt, this.t, this.sw.pos, lead, this.level);
-    if (ev) this.onKuttappan(ev, lead);
+    const ev = k.update(dt, this.t, this.sw.pos, lead, this.level, beforeX, beforeY);
+    if (ev) this.onKuttappan(ev);
     if (!k.active) return;
     const dx = k.pos.x - gx;
     this.tauntT -= dt;
@@ -203,7 +204,7 @@ export const Encounters = {
     }
   },
 
-  onKuttappan(ev, lead) {
+  onKuttappan(ev) {
     const at = this.kutt.pos.clone();
     if (ev.type === 'dodged') {
       this.pop('He dodged! After him!', 'bad');
@@ -221,13 +222,11 @@ export const Encounters = {
       this.slowmo = 0.4;
       if (ev.type === 'hit') return;
     }
-    const victory = ev.chapter === FINALE && ev.type === 'caught';
-    if (victory) {
-      progress.victory = true;
-      progress.victoryX = this.distance;
-    }
-    this.kutt.reset(this.sw.pos.x + lead + 12, victory ? FINALE + 1 : Math.min(ev.chapter + 1, FINALE));
-    if (!this.demo) this.pendingCard = { chapter: ev.chapter, caught: ev.type === 'caught', victory };
+    this.caughtKuttappan = ev.type === 'caught';
+    if (ev.chapter !== FINALE || !this.caughtKuttappan) return;
+    this.route.startEncore(this.distance);
+    this.level.refreshAhead(this.distance);
+    this.changeChapter(this.route.at(this.distance), true);
   },
 
   throwAt(x, y, ceiling = 15) {

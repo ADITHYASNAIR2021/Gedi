@@ -1,5 +1,5 @@
 // Local-only QA controls. This module is omitted from production builds.
-import { CHAPTERS } from './game/story.js';
+import { CHAPTERS, ENCORE } from './game/story.js';
 import { makeBus, makeAuto } from './entities/vehicles.js';
 import * as THREE from 'three';
 
@@ -10,6 +10,7 @@ export function installInspector({ game, stage, startRun, toMenu, getState, devi
   const select = document.createElement('select');
   select.setAttribute('aria-label', 'QA chapter');
   CHAPTERS.forEach((ch, i) => select.add(new Option(ch.name, i)));
+  select.add(new Option('Encore', ENCORE));
   const play = document.createElement('button');
   play.textContent = 'Test chapter';
   play.onclick = () => { toMenu(); startRun(Number(select.value)); };
@@ -74,6 +75,18 @@ export function installInspector({ game, stage, startRun, toMenu, getState, devi
     button.onclick = () => { if (getState() === 'play') run(); };
     return button;
   };
+  const checkpoint = action('Test route checkpoint', () => {
+    const x = game.chapter.index === ENCORE - 1 ? game.kutt.firstPerch + 1 : game.chapter.end + .2;
+    if (x <= game.distance) return;
+    if (game.sling) game.sling.el.release();
+    game.detach();
+    game.sling = null;
+    game.fallT = game.dying = game.slowmo = game.acc = 0;
+    game.setHold(false);
+    game.sw.reset(x, 8);
+    game.sw.vel.x = 6;
+    game.stage.follow(game.sw.pos, game.sw.vel, 1, true);
+  });
   const impact = type => {
     if (game.fallT || game.dying) return;
     game.invuln = 0;
@@ -105,22 +118,35 @@ export function installInspector({ game, stage, startRun, toMenu, getState, devi
   const boat = action('Test vallam', () => dropOn(x => game.level.addBoat(x, -0.8, true).mesh));
   const line = () => panel.append(document.createElement('br'));
   panel.append('LOCAL QA · not included in release'); line(); panel.append(select, play); line();
+  panel.append(checkpoint); line();
   panel.append(auto, autoLabel); line(); panel.append(touch, touchLabel); line(); panel.append(boss, finish); line(); panel.append(tea, rhythm); line(); panel.append(face, rump, normal); line(); panel.append(coconut, banana); line(); panel.append(radio, reply, theri, quip); line(); panel.append(bus, autoRoof, boat); line(); panel.append(hide, stats);
   document.body.append(panel);
-  let frames = 0, elapsed = 0, display = 0;
+  let frames = 0;
+  let sampledState = getState();
+  let sampleStart = performance.now();
   const original = game.update.bind(game);
   game.update = dt => {
     if (auto.checked && getState() === 'play') game.autopilot();
     original(dt);
-    frames++; elapsed += dt; display += dt;
-    if (display < 0.5) return;
+    const now = performance.now();
+    const state = getState();
+    if (state !== sampledState) {
+      sampledState = state;
+      sampleStart = now;
+      frames = 0;
+      return;
+    }
+    frames++;
+    const elapsed = (now - sampleStart) / 1000;
+    if (elapsed < 0.5) return;
     const info = stage.renderer.info;
     const v = game.sw.vel;
     const sound = game.audio;
     const clip = sound.reaction && Object.keys(sound.clips).find(name => sound.clips[name] === sound.reaction.buffer);
     const loop = sound.chapterMusicTitle;
     const soundStatus = clip ? `Voice · ${sound.reactionRole} · ${clip}` : sound.radioActive ? 'Onam playing' : loop ? `${loop} looping` : sound.melam ? 'Recorded melam looping' : 'Melam stopped';
-    stats.textContent = `${getState()} · ${Math.round(frames / elapsed)} fps\n${info.render.calls} draws · ${Math.round(info.render.triangles / 1000)}k triangles\n${info.memory.geometries} geometries · ${info.memory.textures} textures\n${game.snapshot().distance}m · ${game.health} HP · ${Math.hypot(v.x, v.y).toFixed(1)}m/s\n${soundStatus}`;
-    frames = 0; elapsed = 0; display = 0;
+    stats.textContent = `${state} · ${Math.round(frames / elapsed)} fps\n${info.render.calls} draws · ${Math.round(info.render.triangles / 1000)}k triangles\n${info.memory.geometries} geometries · ${info.memory.textures} textures\n${game.snapshot().distance}m · ${game.health} HP · ${Math.hypot(v.x, v.y).toFixed(1)}m/s\n${soundStatus}`;
+    frames = 0;
+    sampleStart = now;
   };
 }

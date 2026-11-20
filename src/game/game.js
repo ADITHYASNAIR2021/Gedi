@@ -4,13 +4,14 @@ import { Swinger, TUNING, perfectRelease, launchVelocity } from './swing.js';
 import { Kuttappan } from './kuttappan.js';
 import { Aim } from './aim.js';
 import { Encounters } from './encounters.js';
-import { chapterAt, chapterStart, progress, CALLOUTS, THERI, CLEAN, pick } from './story.js';
+import { ENCORE, chapterStart, routeProgress, CALLOUTS, THERI, CLEAN, pick } from './story.js';
 import { GEDI_SCALE } from '../entities/gedi.js';
 import { RunPerks } from './perks.js';
 
 const STEP = 1 / 120;
 const FEET = 1.15 * GEDI_SCALE;
 const RAGE_TIME = 8;
+const FINALE_APPROACH = 0.72;
 const MAX_HEALTH = 100;
 const FALL_DAMAGE = 35;
 const HITS = {
@@ -21,7 +22,7 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const v3 = new THREE.Vector3();
 
 export class Game {
-  // deps: { stage, env, level, fx, audio, hud, gedi, settings, touch }
+  // deps: { stage, env, level, route, fx, audio, hud, gedi, settings, touch }
   constructor(deps) {
     Object.assign(this, deps);
     this.sw = new Swinger();
@@ -43,8 +44,7 @@ export class Game {
   start({ chapter = 0, demo = false, teach = false } = {}) {
     this.projectiles.forEach((p) => this.stage.scene.remove(p.mesh));
     this.projectiles = [];
-    progress.victory = false;
-    progress.victoryX = 0;
+    this.route.reset(chapter);
     this.perks.reset();
     this.audio.setFestival?.(0);
     this.gedi.resetMotion?.();
@@ -54,13 +54,13 @@ export class Game {
     Object.assign(this, {
       demo, teach, startX, t: 0, time: 0, acc: 0, distance: startX, distPts: 0, bonus: 0, health: MAX_HEALTH, combo: 1,
       shield: false, magnet: 0, invuln: 0, stunned: 0, cooldown: 0, lastReleased: null, current: null, style: null, bounceSpring: null, teaSlow: 0,
-      sling: null, sneezeT: 0, fallT: 0, dying: 0, slowmo: 0, bounceCooldown: 0, cfgName: '', fireworkT: 1, coconutT: 2, tauntT: 4,
+      sling: null, sneezeT: 0, fallT: 0, dying: 0, slowmo: 0, bounceCooldown: 0, fireworkT: 1, coconutT: 2, tauntT: 4,
       kthrowT: 3, replyT: 0, theriPopT: 0, theri: 0, rage: 0, dustT: 0, pendingCard: null, holding: true,
       grabbed: new Set(), tut: { grabs: 0, releases: 0 },
-      radioPlayed: false, ambush: null, coconutWarning: null, vallamSeen: false, quipT: rand(14, 25),
+      radioPlayed: false, ambush: null, coconutWarning: null, vallamSeen: false, quipT: rand(14, 25), caughtKuttappan: false,
       stats: { elephants: 0, perfects: 0, anjaam: 0, theri: 0, names: [] },
     });
-    this.applyBiome(chapterAt(startX), true);
+    this.applyBiome(this.route.at(startX), true);
     this.hangFrom(first);
     this.kutt.reset(startX + 12, chapter);
     this.gedi.setRage(false);
@@ -84,12 +84,17 @@ export class Game {
   get score() { return Math.floor(this.distPts) + this.bonus; }
 
   snapshot() {
-    const ch = chapterAt(this.distance);
-    const start = chapterStart(ch.index);
-    const progressK = ch.encore ? 1 : (this.distance - start) / (ch.cfg.end - start);
+    const ch = this.chapter;
+    const meter = routeProgress(ch, this.distance);
+    const finale = ch.index === ENCORE - 1;
+    const approachEnd = this.kutt.firstPerch - 18;
+    const approach = finale ? THREE.MathUtils.clamp((this.distance - ch.start) / (approachEnd - ch.start), 0, 1) : 0;
+    const objective = finale && this.distance >= approachEnd ? `Nettipattam · ${this.kutt.hits}/${this.kutt.need} bonks`
+      : ch.encore ? `Leg ${ch.leg} · ${meter.travelled}/${meter.length} m` : `${meter.travelled}/${meter.length} m`;
     return {
       score: this.score, distance: Math.floor(this.distance - this.startX), health: this.health, combo: this.combo,
-      shield: this.shield, magnet: this.magnet > 0, chapterName: ch.cfg.name, progress: progressK,
+      shield: this.shield, magnet: this.magnet > 0, chapterName: ch.cfg.name, objective,
+      progress: finale ? approach * FINALE_APPROACH + (this.kutt.hits / this.kutt.need) * (1 - FINALE_APPROACH) : meter.progress,
       beat: this.audio.beatPhase(), theri: this.theri, rage: this.rage > 0,
       radio: this.audio.radioActive,
       soundtrack: this.audio.chapterMusicTitle,
@@ -126,7 +131,7 @@ export class Game {
   add(points) { this.bonus += points * (this.rage > 0 ? 2 : 1); }
 
   applyBiome(ch, instant = false) {
-    this.cfgName = ch.cfg.name;
+    this.chapter = ch;
     this.cfg = ch.cfg;
     this.stage.setBiome(ch.cfg, instant);
     this.env.setBiome(ch.cfg);
@@ -134,6 +139,31 @@ export class Game {
     this.audio.setChapterMusic(ch.cfg.music);
     this.audio.setAmbience?.(ch.cfg);
     if (!instant && !this.demo) this.hud.banner(ch.cfg.name, ch.cfg.place);
+  }
+
+  recordDistance() {
+    const x = this.sw.pos.x;
+    if (x <= this.distance) return;
+    this.distPts += (x - this.distance) * 2 * (this.rage > 0 ? 2 : 1);
+    this.distance = x;
+  }
+
+  changeChapter(next, victory = false) {
+    const previous = this.chapter;
+    const storyCard = !this.demo && !previous.encore;
+    this.applyBiome(next, storyCard);
+    this.kutt.reset(this.distance + 12, next.index);
+    for (const shot of this.projectiles) this.stage.scene.remove(shot.mesh);
+    this.projectiles.length = 0;
+    this.coconutWarning = null;
+    this.ambush = null;
+    this.replyT = 0;
+    this.coconutT = 2;
+    this.kthrowT = 3;
+    this.tauntT = 4;
+    this.invuln = Math.max(this.invuln, 1.15);
+    if (storyCard) this.pendingCard = { chapter: previous.index, caught: this.caughtKuttappan, victory };
+    this.caughtKuttappan = false;
   }
 
   // ---------- grabbing & releasing ----------
@@ -356,6 +386,7 @@ export class Game {
   }
 
   fall() {
+    this.recordDistance();
     if (this.demo || this.rage > 0 || this.shield) {
       const label = this.demo ? '' : this.rage > 0 ? 'RAGE BOUNCE!' : 'CHAYA SAVE!';
       if (this.rage <= 0) this.shield = false;
@@ -403,7 +434,7 @@ export class Game {
       this.level.stepTraffic(dt);
       this.tickVisuals(dt);
       if (this.fallT <= 0) {
-        this.hangFrom(this.level.respawnElephant(this.sw.pos.x));
+        this.hangFrom(this.level.respawnElephant(this.sw.pos.x, this.chapter));
         this.invuln = 2;
         this.holding = true;
         this.stage.follow(this.sw.pos, this.sw.vel, 1, true);
@@ -434,7 +465,7 @@ export class Game {
     if (!this.fallT && !this.dying) this.tickWorld(dt, beforeX, beforeY);
     this.tickVisuals(dt);
 
-    if (this.pendingCard && this.slowmo <= 0) {
+    if (this.pendingCard) {
       const card = this.pendingCard;
       this.pendingCard = null;
       this.emit('chapter', card);
@@ -605,11 +636,12 @@ export class Game {
 
   end() {
     this.running = false;
+    this.audio.stopMusic();
     this.aim.hide();
     this.emit('over', {
       score: this.score,
       distance: Math.floor(this.distance - this.startX),
-      chapter: chapterAt(this.distance).index + 1,
+      chapter: this.chapter.index + 1,
       elephants: this.stats.elephants,
       perfects: this.stats.perfects,
       anjaam: this.stats.anjaam,

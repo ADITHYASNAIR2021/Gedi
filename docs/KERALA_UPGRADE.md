@@ -1,6 +1,6 @@
 # Kerala game upgrade
 
-This log tracks the approved audio, elephant and scenery work. The references below are the working source shortlist.
+This log tracks the audio, elephant, scenery and chapter progression work. The references below are the working source shortlist.
 
 | Work | Status | Check before completion |
 |---|---|---|
@@ -12,7 +12,8 @@ This log tracks the approved audio, elephant and scenery work. The references be
 | Alappuzha | Implemented | Punnamada photo backdrop, low banks, moving chundan vallams with 20 animated paddlers, and a one-time 45-point race rescue. |
 | Munnar | Implemented | Curved tea rows, shade trees and valley mist layered behind the swing route. |
 | Paappans, riders and crowds | Implemented | Seated paappans, animated fans and whisks, instanced cheering spectators and chenda players. |
-| Build and local playtest | Complete | All 38 tests and the production build passed. Smoke-tested the five chapters and the compact Album in Chrome. |
+| Chapter progression | Implemented | Distance checkpoints switch the HUD, scene, music and story card together. The finale meter tracks three bonks. Encore starts at the win and resets its meter for each 500 m leg. |
+| Build and local playtest | Complete | All 41 tests and the production build passed. Chrome checks covered the five story chapters, all five Encore regions, Continue, retries, Album replay, pause and the compact touch controls. |
 | Physical phone playtest | Pending | Check sustained frame rate, touchscreen handling, loop seam and speaker balance on iPhone Safari and Android Chrome. |
 | Public audio reuse | Awaiting source details | Confirm source or permission for the supplied tracks before public distribution. |
 
@@ -30,6 +31,8 @@ Chapter loops trim the dead air at the restart and blend the audio across the se
 - Onam resumed after recorded Myre and Aiyooo reactions in Chrome. It also paused and resumed with the game and handed back to the melam. Automated checks cover clip priority and the first beat after the loop wraps.
 - Chrome loaded all three new chapter songs, played the assigned banana and coconut reactions, cycled the Theri voices and returned to the chapter song. Chrome also played Aiyooo with Theri disabled.
 - At 568 × 320 the Album scrolls internally and the replay control fits in the viewport. The standard menu opens the Album outside the inspector.
+- A live Pooram Morning run showed the meter filling as Gedi swung. Chrome checkpoint tests confirmed the Thirunakkara interlude, chapter progress resets and a finale win before the 2,000 m mark. Encore switched through five regions and back to Pooram Morning with the right soundtrack and a fresh meter each time. The finale unlock made Encore available from the menu.
+- The slow Chrome test session triggered the adaptive rendering fallback and continued to advance the meter. Frame rate remained low in that session. Device performance still needs a physical phone playtest.
 
 ## References and resources
 
