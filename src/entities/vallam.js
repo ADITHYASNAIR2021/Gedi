@@ -47,9 +47,11 @@ function part(g, geometry, material, x, y, z, w, h = w, d = w) {
   return mesh;
 }
 
+export const VALLAM_FOOTPRINT = [10.7, 12.7]; // Includes the visible wake behind the hull.
+
 export function makeVallam(race = false) {
   const boat = new THREE.Group();
-  boat.userData = { top: 1.13, half: 8.1, launch: { up: 14.7, forward: 12.0 } };
+  boat.userData = { top: 1.13, half: 8.1, footprint: VALLAM_FOOTPRINT, launch: { up: 14.7, forward: 12.0 } };
   part(boat, hull, finish, 0, -.04, 0, 1);
   part(boat, box, grain, 0, 1.04, 0, 16.2, .18, 1.30);
   for (const z of [-.74, .74]) part(boat, box, trim, 0, 1.045, z, 16.45, .086, .055);

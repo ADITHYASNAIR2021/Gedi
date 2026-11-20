@@ -75,17 +75,25 @@ export function installInspector({ game, stage, startRun, toMenu, getState, devi
     button.onclick = () => { if (getState() === 'play') run(); };
     return button;
   };
-  const checkpoint = action('Test route checkpoint', () => {
-    const x = game.chapter.index === ENCORE - 1 ? game.kutt.firstPerch + 1 : game.chapter.end + .2;
-    if (x <= game.distance) return;
+  const approachCheckpoint = (x, y, vx, vy) => {
     if (game.sling) game.sling.el.release();
     game.detach();
-    game.sling = null;
+    game.sling = game.bounceSpring = null;
     game.fallT = game.dying = game.slowmo = game.acc = 0;
     game.setHold(false);
-    game.sw.reset(x, 8);
-    game.sw.vel.x = 6;
+    game.sw.reset(x, y);
+    Object.assign(game.sw.vel, { x: vx, y: vy });
     game.stage.follow(game.sw.pos, game.sw.vel, 1, true);
+  };
+  const checkpoint = action('Test route checkpoint', () => {
+    const x = game.chapter.index === ENCORE - 1 ? game.kutt.firstPerch + 1 : game.chapter.end + .2;
+    if (x > game.distance) approachCheckpoint(x, 8, 6, 0);
+  });
+  const shorelineFall = action('Test shoreline fall', () => {
+    const x = game.chapter.end;
+    if (x > game.distance && game.chapter.cfg.water !== game.route.at(x).cfg.water) {
+      approachCheckpoint(x - .02, 1.70, 6, -10);
+    }
   });
   const impact = type => {
     if (game.fallT || game.dying) return;
@@ -98,27 +106,32 @@ export function installInspector({ game, stage, startRun, toMenu, getState, devi
   const radio = action('Test radio', () => game.audio.playRadio());
   const reply = action('Test Myre', () => game.shout(true));
   const quip = action('Test random clip', () => game.audio.randomQuip());
-  const dropOn = (place) => {
+  const dropOn = (place, x = game.sw.pos.x) => {
     if (game.fallT || game.dying || game.sling) return;
+    const mesh = place(x);
+    if (!mesh) return;
     game.detach();
     game.setHold(false);
     game.bounceCooldown = 0;
     game.bounceSpring = null;
-    const { x } = game.sw.pos;
-    const mesh = place(x);
     game.sw.reset(x, mesh.userData.top + 2.85);
     game.sw.vel.y = -15;
+    game.stage.follow(game.sw.pos, game.sw.vel, 1, true);
   };
   const testRoof = (make, label) => dropOn(x => {
     const mesh = make();
-    return game.level.addVehicle(mesh, x - (mesh.userData.center ?? 0), -0.8, label).mesh;
+    return game.level.addVehicle(mesh, x - (mesh.userData.center ?? 0), -0.8, label)?.mesh;
   });
   const bus = action('Test KSRTC', () => testRoof(makeBus, 'KSRTC RESCUE!'));
   const autoRoof = action('Test auto', () => testRoof(makeAuto, 'AUTO CHETTAN SAVE!'));
-  const boat = action('Test vallam', () => dropOn(x => game.level.addBoat(x, -0.8, true).mesh));
+  const boat = action('Test vallam', () => {
+    if (!game.chapter.cfg.water) return;
+    const x = THREE.MathUtils.clamp(game.sw.pos.x, game.chapter.start + 16, game.chapter.end - 16);
+    dropOn(at => game.level.addBoat(at, -0.8, true)?.mesh, x);
+  });
   const line = () => panel.append(document.createElement('br'));
   panel.append('LOCAL QA · not included in release'); line(); panel.append(select, play); line();
-  panel.append(checkpoint); line();
+  panel.append(checkpoint, shorelineFall); line();
   panel.append(auto, autoLabel); line(); panel.append(touch, touchLabel); line(); panel.append(boss, finish); line(); panel.append(tea, rhythm); line(); panel.append(face, rump, normal); line(); panel.append(coconut, banana); line(); panel.append(radio, reply, theri, quip); line(); panel.append(bus, autoRoof, boat); line(); panel.append(hide, stats);
   document.body.append(panel);
   let frames = 0;

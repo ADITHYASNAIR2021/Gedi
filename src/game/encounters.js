@@ -47,13 +47,9 @@ export const Encounters = {
     const sw = this.sw;
     const gx = sw.pos.x;
     const gy = sw.pos.y;
-    this.recordDistance();
-    const ch = this.route.at(this.distance);
-    if (ch.key !== this.chapter.key) {
-      this.changeChapter(ch);
-      if (this.pendingCard) return;
-    }
-    this.tickChase(dt, ch);
+    this.syncChapter();
+    if (this.pendingCard) return;
+    this.tickChase(dt, this.chapter);
 
     for (const it of this.level.items) {
       const p = it.mesh.position;
@@ -146,9 +142,10 @@ export const Encounters = {
   tickChase(dt, chapter) {
     if (this.demo) return;
     if (chapter.index === 2 && !this.vallamSeen && this.distance >= chapterStart(2) + 19) {
-      this.vallamSeen = true;
-      this.level.addBoat(this.sw.pos.x + 15, -1.3, true);
-      this.hud.banner('VALLAMKALI', 'Land on the race boat for +45');
+      if (this.level.addBoat(this.sw.pos.x + 15, -1.3, true)) {
+        this.vallamSeen = true;
+        this.hud.banner('VALLAMKALI', 'Land on the race boat for +45');
+      }
     }
     if (this.settings.music && !this.radioPlayed && this.distance >= this.startX + 125 && !this.pendingCard && !this.ambush?.shots) {
       this.radioPlayed = this.audio.playRadio();
@@ -160,6 +157,7 @@ export const Encounters = {
     if (!this.ambush && chapter.index === 1 && this.distance >= AMBUSH_AT) {
       const x = this.sw.pos.x;
       const rescue = this.level.addVehicle(makeAuto(true), x + 13, -1.6, 'AUTO SHORTCUT +60');
+      if (!rescue) return;
       rescue.ambush = true;
       this.ambush = { shots: 2, timer: 0.95 };
       this.hud.banner('BANANA AMBUSH', 'Swing high or drop onto the auto');

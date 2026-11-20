@@ -41,7 +41,7 @@ html, body {
 .bar-end { position: absolute; right: -12px; top: -9px; font-size: 18px; }
 #h-progress { position: relative; height: 100%; width: 0; border-radius: 8px; background: linear-gradient(90deg, var(--gold), #ff7b00); }
 .bar-player { position: absolute; right: -4px; top: 50%; width: 8px; height: 8px; transform: translateY(-50%); border: 1px solid #74562b; border-radius: 50%; background: #fff5cb; }
-.route-detail { margin-top: 5px; color: #fff0c7; font: 600 10px system-ui,sans-serif; font-variant-numeric: tabular-nums; text-shadow: 0 1px 4px #08180e; }
+.route-detail { margin-top: 5px; color: #fff0c7; font: 700 11px system-ui,sans-serif; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #08180e, 0 0 4px #08180e; }
 .hud-right { position: absolute; right: 16px; top: calc(10px + var(--safe-t)); display: flex; gap: 10px; align-items: center; }
 .icon-btn { pointer-events: auto; width: 40px; height: 40px; border-radius: 12px; border: 2px solid var(--paper); background: var(--card); color: var(--paper); font-size: 14px; font-weight: 800; cursor: pointer; }
 .hud-bottom { position: absolute; left: 16px; bottom: calc(14px + var(--safe-b)); display: flex; gap: 12px; align-items: center; }
@@ -305,14 +305,14 @@ body.screen-open #touch-controls { display: none; }
 /* Readable run rewards live away from the flight path. */
 #loading { position: fixed; inset: 0; z-index: 25; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #102d26; text-align: center; }
 #loading .eyebrow { margin: 20px 0 0; }#loading p:last-child { color: var(--muted); font-size: 14px; }.loading-mark { color: var(--gold); font-size: 56px; animation: loadingturn 4s linear infinite; }@keyframes loadingturn { to { transform: rotate(360deg); } }
-#festival-hud { position: absolute; left: 50%; top: calc(65px + var(--safe-t)); transform: translateX(-50%); width: 240px; text-align: center; border-radius: 10px; padding: 7px 12px; background: #102d2680; border: 1px solid #f1cb7722; }
+#festival-hud { position: absolute; left: 50%; top: calc(100% + 5px); transform: translateX(-50%); width: 240px; text-align: center; border-radius: 10px; padding: 7px 12px; background: #102d2680; border: 1px solid #f1cb7722; }
 .festival-kicker { font: 600 8px system-ui,sans-serif; letter-spacing: .22em; color: #d7c592; display: block; }#h-rhythm { font-size: 12px; font-weight: 600; }
 .rhythm-pips { display: flex; justify-content: center; gap: 4px; margin-top: 5px; }.rhythm-pips i { display: block; height: 3px; width: 14px; border-radius: 3px; background: #fff8df33; transition: background .25s; }.rhythm-pips .lit { background: #edbf64; box-shadow: 0 0 8px #eab74b66; }
 #festival-hud.is-building { border-color: #f1cb7780; background: #243c2adb; box-shadow: 0 0 24px rgb(241 203 119 / var(--beat-glow,0)); }
 #personality-hud { position: absolute; left: max(22px,var(--safe-l)); top: calc(106px + var(--safe-t)); display: flex; align-items: center; gap: 8px; background: #102d2699; padding: 8px 12px; border-radius: 9px; }#h-personality-color { width: 5px; height: 26px; border-radius: 3px; }#personality-hud b { display: block; font: 700 9px system-ui,sans-serif; letter-spacing: .12em; }#personality-hud small { display: block; color: #e1dfc8; font: 10px system-ui,sans-serif; margin-top: 4px; }
 #tea-hud { position: absolute; left: 50%; top: calc(143px + var(--safe-t)); transform: translateX(-50%); width: 260px; padding: 10px 15px; text-align: center; border-radius: 10px; background: #f1cb77eb; color: #172d22; box-shadow: 0 5px 25px #102d2644; }#tea-hud b { display: block; font-size: 18px; }#tea-hud span { font: 10px system-ui,sans-serif; }
 @media (max-height: 650px) and (orientation: landscape) {
- #festival-hud { top: calc(50px + var(--safe-t)); padding: 4px 9px; width: 205px; }.festival-kicker { font-size: 7px; }#h-rhythm { font-size: 10px; }.rhythm-pips { margin-top: 3px; gap: 3px; }.rhythm-pips i { width: 12px; height: 2px; }
+ #festival-hud { padding: 4px 9px; width: 205px; }.festival-kicker { font-size: 7px; }#h-rhythm { font-size: 10px; }.rhythm-pips { margin-top: 3px; gap: 3px; }.rhythm-pips i { width: 12px; height: 2px; }
  #personality-hud { left: max(14px,var(--safe-l)); top: calc(77px + var(--safe-t)); padding: 6px 9px; }#h-personality-color { height: 20px; }#personality-hud b { font-size: 8px; }#personality-hud small { font-size: 9px; margin-top: 3px; }
  #tea-hud { top: calc(105px + var(--safe-t)); width: 230px; padding: 6px 10px; }#tea-hud b { font-size: 15px; }#tea-hud span { font-size: 9px; }
  #screen-over .stats { font-size: 11px; gap: 1px 18px; }
@@ -356,7 +356,6 @@ body.screen-open #touch-controls { display: none; }
 .mode-actions { display: flex; gap: 8px; }
 .mode-actions .btn { flex: 1; min-width: 0; }
 @media (max-height: 650px) and (orientation: landscape) {
-  #festival-hud { top: calc(63px + var(--safe-t)); }
   .route-detail { font-size: 9px; }
 }
 #aana-unlock {

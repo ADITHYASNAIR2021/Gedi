@@ -83,7 +83,6 @@ function roadTexture() {
     g.fillRect(16, 29, 64, 6);
   });
   t.wrapS = THREE.RepeatWrapping;
-  t.repeat.set(90, 1);
   return t;
 }
 
@@ -302,11 +301,11 @@ function cheenaVala(g, x, z) {
   net.rotation.set(-1.1, 0, 0.2);
 }
 
-function lilies(g, x0) {
+function lilies(g, start, end) {
   for (let i = 0; i < 9; i++) {
-    const x = x0 + Math.random() * CHUNK;
+    const x = start + Math.random() * (end - start);
     const z = -3 - Math.random() * 9;
-    const pad = add(g, G.disc, M.lily, x, 0.03, z, 0.5 + Math.random() * 0.5);
+    const pad = add(g, G.disc, M.lily, x, 0.065, z, 0.5 + Math.random() * 0.5);
     pad.rotation.x = -Math.PI / 2;
     if (i % 3 === 0) add(g, G.low, M.lilyFlower, x, 0.18, z, 0.2, 0.16, 0.2);
   }
@@ -341,50 +340,87 @@ export class Environment {
     this.chunks = new Map();
     this.trailMat = photographicMaterial('trail', { repeat: [220, 110] });
     this.forestMat = photographicMaterial('forest', { repeat: [220, 110] });
-    this.groundMat = this.trailMat;
-    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(700, 600), this.groundMat);
-    this.ground.rotation.x = -Math.PI / 2;
-    this.ground.receiveShadow = true;
-    scene.add(this.ground);
-    this.roadTex = roadTexture();
-    this.road = new THREE.Mesh(new THREE.PlaneGeometry(700, 4), new THREE.MeshStandardMaterial({ map: this.roadTex, roughness: 0.9 }));
-    this.road.rotation.x = -Math.PI / 2;
-    this.road.position.set(0, 0.02, 3.6);
-    this.road.receiveShadow = true;
-    scene.add(this.road);
-    this.groundTarget = new THREE.Color('#d2a565');
-    this.waterUniforms = { time: { value: 0 } };
-    this.waterMat = new THREE.MeshStandardMaterial({ color: '#367d78', roughness: 0.28, metalness: 0.4 });
-    this.waterMat.onBeforeCompile = shader => {
-      shader.uniforms.time = this.waterUniforms.time;
-      shader.vertexShader = 'uniform float time; varying vec3 waterPos;\n' + shader.vertexShader;
-      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
-        #include <begin_vertex>
-        transformed.z += sin(position.x * 1.8 + time * 1.2) * 0.035 + sin(position.y * 2.5 - time) * 0.025;
-        waterPos = vec3(position.xy, 0.0);
-      `);
-      shader.fragmentShader = 'uniform float time; varying vec3 waterPos;\n' + shader.fragmentShader;
-      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
-        #include <color_fragment>
-        float ripple = pow(max(0.0, sin(waterPos.x * 2.8 + waterPos.y * 5.5 + sin(waterPos.x * 0.4 + time) * 1.3 + time * 1.5)), 22.0);
-        diffuseColor.rgb += vec3(0.045, 0.065, 0.04) * ripple;
+    for (const mat of [this.trailMat, this.forestMat]) mat.onBeforeCompile = shader => {
+      shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', `
+        #include <uv_vertex>
+        vec2 groundTile = (modelMatrix * vec4(position, 1.0)).xz * vec2(220.0 / 700.0, -110.0 / 600.0);
+        vMapUv = groundTile;
+        vNormalMapUv = groundTile;
       `);
     };
-    this.water = new THREE.Mesh(new THREE.PlaneGeometry(400, 320, 100, 60), this.waterMat);
-    this.water.rotation.x = -Math.PI / 2;
-    this.water.position.y = 0.035;
-    this.water.visible = false;
-    scene.add(this.water);
+    this.groundMat = this.trailMat;
+    this.surfaces = [];
+    this.roadMat = new THREE.MeshStandardMaterial({ map: roadTexture(), roughness: 0.9 });
+    this.roadMat.onBeforeCompile = shader => {
+      shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', `
+        #include <uv_vertex>
+        vMapUv.x = (modelMatrix * vec4(position, 1.0)).x * (90.0 / 700.0);
+      `);
+    };
+    this.groundTarget = new THREE.Color('#d2a565');
+    this.waterUniforms = { time: { value: 0 } };
+    this.waterMat = new THREE.MeshStandardMaterial({ color: '#467c74', roughness: 0.27, metalness: 0.35, transparent: true, depthWrite: false });
+    this.waterMat.onBeforeCompile = shader => {
+      shader.uniforms.time = this.waterUniforms.time;
+      shader.vertexShader = 'varying vec2 waterPos;\n' + shader.vertexShader;
+      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
+        #include <begin_vertex>
+        waterPos = (modelMatrix * vec4(position, 1.0)).xz;
+      `);
+      shader.fragmentShader = 'uniform float time; varying vec2 waterPos;\n' + shader.fragmentShader;
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
+        #include <color_fragment>
+        float wave = sin(waterPos.y * 3.0 + time * 1.1 + sin(waterPos.x * .45 + time * .4) * 1.4);
+        float ripple = smoothstep(.50, 1.0, wave * sin(waterPos.y * 1.3 - waterPos.x * 1.8 - time * .9));
+        diffuseColor.rgb += vec3(.047, .068, .065) * ripple + .013 * wave;
+        diffuseColor.a *= 1.0 - smoothstep(60.0, 155.0, vViewPosition.z);
+      `);
+    };
   }
 
   setBiome(cfg) {
     this.groundMat = cfg.props.includes('jungle') || cfg.props.includes('teahill') ? this.forestMat : this.trailMat;
-    this.ground.material = this.groundMat;
+    for (const { ground } of this.surfaces) ground.material = this.groundMat;
     this.groundTarget.set(cfg.water ? '#6b8e78' : '#ffffff');
-    this.road.visible = !cfg.water;
-    this.water.visible = cfg.water;
-    this.groundMat.roughness = cfg.water ? 0.2 : 0.95;
-    this.groundMat.metalness = cfg.water ? 0.35 : 0;
+  }
+
+  updateSurfaces(camX) {
+    const from = Math.floor((camX - 350) / CHUNK) * CHUNK;
+    if (this.surfaceStart === from && this.surfaceEncore === this.route.encoreStart) return;
+    this.surfaceStart = from;
+    this.surfaceEncore = this.route.encoreStart;
+    const spans = [];
+    for (const { start, end, chapter } of this.route.sections(from, from + 760)) {
+      const water = chapter.cfg.water;
+      const last = spans[spans.length - 1];
+      if (last?.water === water) last.end = end;
+      else spans.push({ start, end, water });
+    }
+    spans.forEach(({ start, end, water }, i) => {
+      let surface = this.surfaces[i];
+      if (!surface) {
+        surface = { lane: new THREE.Mesh(G.plane, this.roadMat), ground: new THREE.Mesh(G.plane, this.groundMat) };
+        for (const plane of [surface.lane, surface.ground]) {
+          plane.rotation.x = -Math.PI / 2;
+          plane.receiveShadow = true;
+          this.scene.add(plane);
+        }
+        this.surfaces.push(surface);
+      }
+      const { lane, ground } = surface;
+      const x = (start + end) / 2;
+      lane.visible = true;
+      lane.material = water ? this.waterMat : this.roadMat;
+      lane.renderOrder = water ? -3 : 0;
+      lane.scale.set(end - start, water ? 600 : 4, 1);
+      lane.position.set(x, water ? .045 : .02, water ? 0 : 3.6);
+      ground.visible = !water;
+      ground.scale.set(end - start, 600, 1);
+      ground.position.x = x;
+    });
+    for (let i = spans.length; i < this.surfaces.length; i++) {
+      this.surfaces[i].lane.visible = this.surfaces[i].ground.visible = false;
+    }
   }
 
   buildChunk(k, chapter) {
@@ -407,14 +443,20 @@ export class Environment {
     const fallsChunk = Math.floor((chapter.start + 46) / CHUNK);
     if (has('waterfall') && (k === fallsChunk || (encore && every(6)))) athirappilly(g, x0 + 20, -37);
     if (has('chayakada') && every(3, 1)) stall(g, x0 + 12, -9, every(2));
-    if (has('houseboat') && Math.random() < 0.8) houseboat(g, x0 + Math.random() * CHUNK, -16 - Math.random() * 14);
-    if (has('cheenavala') && every(2)) cheenaVala(g, x0 + 24, -11);
-    if (has('lily')) lilies(g, x0);
+    if (cfg.water) {
+      const start = Math.max(x0, chapter.start);
+      const end = Math.min(x0 + CHUNK, chapter.end);
+      if (end - start > 13 && has('houseboat') && Math.random() < .8) {
+        houseboat(g, start + 6.5 + Math.random() * (end - start - 13), -16 - Math.random() * 14);
+      }
+      if (has('cheenavala') && every(2) && end - start >= 12) cheenaVala(g, Math.min(end - 4, Math.max(start + 8, x0 + 24)), -11);
+      if (has('lily') && end - start > 2) lilies(g, start + 1, end - 1);
+      alappuzhaShore(g, start, end);
+    }
     if (has('teahill')) munnarPlantation(g, x0, CHUNK, d, every(3, 2));
     if (has('kurinji')) kurinji(g, x0);
 
     if (has('teahill')) ghats(g, x0, CHUNK);
-    if (cfg.water) alappuzhaShore(g, x0, every(3, 1));
     if (!cfg.water) roadsideGrass(g, x0, d);
     if (has('temple') && every(2)) {
       const flagPoints = [];
@@ -435,14 +477,8 @@ export class Environment {
   }
 
   update(dt, t, camX) {
-    this.ground.position.x = camX;
-    // Quantised origin keeps the water pattern attached to the world as the camera moves.
-    this.water.position.x = Math.floor(camX / 100) * 100;
+    this.updateSurfaces(camX);
     this.waterUniforms.time.value = t;
-    this.groundMat.map.offset.x = (camX / 700) * 220;
-    this.groundMat.normalMap.offset.x = this.groundMat.map.offset.x;
-    this.road.position.x = camX;
-    this.roadTex.offset.x = (camX / 700) * 90;
     this.groundMat.color.lerp(this.groundTarget, 1 - Math.exp(-dt * 1.2));
     const from = Math.floor((camX - 70) / CHUNK);
     const to = Math.floor((camX + 150) / CHUNK);

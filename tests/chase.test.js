@@ -101,9 +101,9 @@ test('the active roof moves under Gedi during compression and bus and auto launc
 
 test('the water rescue deck can catch Gedi before the lower elephant sling', () => {
   const { game } = runFixture();
-  game.cfg = CHAPTERS[2];
-  const boat = game.level.addBoat(0, 0, true);
-  game.sw.reset(0, 1.15 * 1.45 + 1.34);
+  game.applyBiome(game.route.at(700));
+  const boat = game.level.addBoat(700, 0, true);
+  game.sw.reset(700, 1.15 * 1.45 + 1.34);
   game.sw.vel.y = -11;
   game.level.findAnjaam = () => ({});
   game.startSling = () => assert.fail('The deck is above the water sling');
@@ -111,6 +111,66 @@ test('the water rescue deck can catch Gedi before the lower elephant sling', () 
   assert.equal(game.bounceSpring.roof, boat);
   assert.equal(game.bonus, 45);
   assert.equal(boat.rescueBonus, 0);
+});
+
+test('boats and road vehicles keep their full footprint on the correct surface in Story and Encore', () => {
+  const { game } = runFixture();
+  for (const shore of [650, 2881.13]) {
+    if (shore > 1000) game.route.startEncore(shore - 1000);
+    const end = game.route.at(shore).end;
+    assert.equal(game.level.addBoat(shore + 2, -2), null);
+    assert.equal(game.level.addBoat(end - 2, 2), null);
+    assert.equal(game.level.addVehicle(makeAuto(), shore, 4, 'Road'), null);
+    assert.equal(game.level.addVehicle(makeBus(), end, -4, 'Road'), null);
+
+    const nearBoat = game.level.addBoat(shore + 11, -2);
+    const farBoat = game.level.addBoat(end - 13, 2);
+    const auto = game.level.addVehicle(makeAuto(), shore - 2, 4, 'Road');
+    const bus = game.level.addVehicle(makeBus(), end + 5, -4, 'Road');
+    assert.ok(nearBoat && farBoat && auto && bus);
+    game.level.stepTraffic(0.5);
+    for (const traffic of [nearBoat, farBoat, auto, bus]) {
+      assert.equal(traffic.mesh.position.x, traffic.previousX);
+      assert.equal(traffic.speed, 0);
+    }
+  }
+});
+
+test('faster traffic waits behind occupied space without overlapping', () => {
+  const { game } = runFixture();
+  const first = game.level.addBoat(715, 0);
+  assert.equal(game.level.addBoat(734, -2), null);
+  const following = game.level.addBoat(745, -2);
+  assert.ok(following);
+  game.level.stepTraffic(1);
+  assert.equal(following.mesh.position.x, 743);
+  for (let i = 0; i < 8; i++) game.level.stepTraffic(0.5);
+  const gap = following.mesh.position.x - first.mesh.position.x;
+  assert.ok(gap >= 24.2 && gap < 25.2);
+});
+
+test('falling across the shoreline updates the scene on the impact frame and lethal falls skip the card', () => {
+  for (const health of [50, 30]) {
+    const { game } = runFixture();
+    const events = [];
+    game.applyBiome(game.route.at(649));
+    game.distance = 649;
+    game.health = health;
+    game.running = true;
+    game.acc = game.time = 0;
+    game.fx.splash = () => events.push('splash');
+    game.tickVisuals = () => events.push(game.snapshot().chapterName);
+    game.emit = (name, card) => events.push([name, card.chapter]);
+    game.sw.reset(649.98, 1.70);
+    Object.assign(game.sw.vel, { x: 6, y: -10 });
+    game.update(1 / 60);
+    assert.equal(game.chapter.index, 2);
+    assert.equal(game.snapshot().objective, '0/400 m');
+    assert.ok(game.distance >= 650);
+    const expected = ['splash', CHAPTERS[2].name];
+    if (health > 35) expected.push(['chapter', 1]);
+    assert.deepEqual(events, expected);
+  }
 });
 
 test('story meter advances and the card, next biome and boss all switch at the same checkpoint', () => {

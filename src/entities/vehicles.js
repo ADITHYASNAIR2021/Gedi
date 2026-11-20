@@ -78,7 +78,7 @@ function wheel(group, x, z, radius, width) {
 
 export function makeBus() {
   const group = new THREE.Group();
-  group.userData = { kind: 'bus', top: 2.95, half: 4.3, launch: { up: 16, forward: 9 }, wheels: [] };
+  group.userData = { kind: 'bus', top: 2.95, half: 4.3, footprint: [4.6, 4.6], launch: { up: 16, forward: 9 }, wheels: [] };
   mesh(group, busBody, [paint.red, paint.cream, paint.cream, paint.black, paint.red, paint.red], 0, 1.775, 0).castShadow = true;
   const front = mesh(group, plane, photoMaterials['bus-front'], -4.43, 1.77, 0, 2.08, 1.96);
   front.rotation.y = -Math.PI / 2;
@@ -104,7 +104,7 @@ export function makeBus() {
 
 export function makeAuto(shortcut = false) {
   const group = new THREE.Group();
-  group.userData = { kind: 'auto', top: 2.14, half: 0.99, center: 0.20, launch: { up: 12.8, forward: 16 }, wheels: [] };
+  group.userData = { kind: 'auto', top: 2.14, half: 0.99, center: 0.20, footprint: [1.6, 1.5], launch: { up: 12.8, forward: 16 }, wheels: [] };
   mesh(group, autoBase, paint.black, 0.2, 0.66, 0).castShadow = true;
   mesh(group, autoNose, paint.yellow, -0.95, 0.91, 0).rotation.z = -0.14;
   mesh(group, autoRoof, photoMaterials['auto-canopy'], 0.20, 2.005, 0).castShadow = true;

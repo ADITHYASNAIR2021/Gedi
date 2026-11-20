@@ -133,6 +133,26 @@ export class Stage {
     } catch { /* Procedural outdoor lighting remains available offline. */ }
   }
 
+  async prepareBackwaters() {
+    try {
+      const photo = await new THREE.TextureLoader().loadAsync('/assets/kerala/alappuzha.webp');
+      photo.colorSpace = THREE.SRGBColorSpace;
+      this.backwaterPhoto = photo;
+      this.fitBackwaterPhoto();
+    } catch { /* Use the outdoor sky if the photo cannot load. */ }
+  }
+
+  fitBackwaterPhoto() {
+    const photo = this.backwaterPhoto;
+    if (!photo) return;
+    const imageAspect = photo.image.width / photo.image.height;
+    const width = Math.min(1, this.camera.aspect / imageAspect);
+    // Preserve the sky and the opposite bank on ultrawide displays.
+    const height = Math.max(.86, Math.min(1, imageAspect / this.camera.aspect));
+    photo.repeat.set(width, height);
+    photo.offset.set((1 - width) * .5, (1 - height) * .55);
+  }
+
   makeGlow() {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 64;
@@ -168,6 +188,7 @@ export class Stage {
     this.target.fog.set(cfg.fog);
     this.target.night = cfg.night ? 1 : 0;
     this.target.forest = cfg.props.includes('jungle') || cfg.props.includes('temple');
+    this.target.water = cfg.water;
     if (instant) this.blend(1);
   }
 
@@ -186,17 +207,18 @@ export class Stage {
     this.sunDisc.scale.setScalar(1 - 0.45 * n);
     this.sunGlow.material.opacity = 0.48 * (1 - n);
     this.rim.intensity = 1.4 * (1 - n) + 0.4 * n;
-    this.scene.environmentIntensity = 0.32 - n * 0.18;
+    this.scene.environmentIntensity = this.outdoorSky ? .65 - n * .5 : .32 - n * .18;
     this.forestAmount += ((this.target.forest ? 1 : 0) - this.forestAmount) * k;
-    if (this.photoForest) this.photoForest.material.opacity = this.forestAmount * (1 - n);
-    if (this.outdoorSky) {
-      this.scene.background = n > .55 ? null : this.outdoorSky;
-      this.sky.visible = n > .55;
-      this.scene.backgroundIntensity = .65 * (1 - n * .8);
-      this.scene.environmentIntensity = .65 - n * .5;
-      this.sunGlow.visible = false;
-      this.sunDisc.visible = n > .55;
+    if (this.photoForest) {
+      this.photoForest.material.opacity = this.forestAmount * (1 - n);
+      this.photoForest.visible = !this.target.water && this.photoForest.material.opacity > .005;
     }
+    const backwaters = this.target.water ? this.backwaterPhoto : null;
+    this.scene.background = backwaters || (n > .55 ? null : this.outdoorSky);
+    this.scene.backgroundIntensity = backwaters ? .9 : .65 * (1 - n * .8);
+    this.sky.visible = !this.scene.background;
+    this.sunGlow.visible = !backwaters && !this.outdoorSky;
+    this.sunDisc.visible = !backwaters && (!this.outdoorSky || n > .55);
   }
 
   resize() {
@@ -206,6 +228,7 @@ export class Stage {
     this.camera.aspect = w / h;
     this.camera.fov = w / h < 1 ? 58 : 45;
     this.camera.updateProjectionMatrix();
+    this.fitBackwaterPhoto();
   }
 
   // Half the world width visible at the gameplay plane (z = 0).

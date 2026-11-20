@@ -17,7 +17,7 @@ export const CHAPTERS = [
   },
   {
     name: 'Backwater Bedlam', place: 'Alappuzha · Vembanad Kayal', end: 1050, bpm: 122, music: 'vembanadu',
-    sky: ['#ff9a6b', '#ffe9c4'], fog: '#f6cfa5', ground: '#2e8a9a', water: true, night: false,
+    sky: ['#a7c2d4', '#e5e9df'], fog: '#a8bbb7', ground: '#2e8a9a', water: true, night: false,
     gap: [4.5, 8.5], pedestal: 0.7, parasol: 0.2, monkey: 0.25, coconut: 0.4, bus: 0, auto: 0, boat: 0.65,
     sleepy: 0.08, sneezy: 0.12, baby: 0.15, sway: 0.5, anjaam: 0.6, kthrow: 0.6,
     props: ['palm', 'houseboat', 'cheenavala', 'lily'],
@@ -60,7 +60,7 @@ function encoreLeg(loop, origin) {
     index: ENCORE,
     region,
     start,
-    end: start + ENCORE_LENGTH,
+    end: origin + (loop + 1) * ENCORE_LENGTH,
     encore: true,
     leg: loop + 1,
     cfg: {
@@ -90,10 +90,22 @@ export class Route {
 
   at(distance) {
     if (this.encoreStart !== null && distance >= this.encoreStart) {
-      const loop = Math.floor((distance - this.encoreStart) / ENCORE_LENGTH);
+      let loop = Math.floor((distance - this.encoreStart) / ENCORE_LENGTH);
+      if (distance >= this.encoreStart + (loop + 1) * ENCORE_LENGTH) loop++;
+      else if (distance < this.encoreStart + loop * ENCORE_LENGTH) loop--;
       return this.legs[loop] ??= encoreLeg(loop, this.encoreStart);
     }
     return storyRoute.find(chapter => distance < chapter.end) ?? storyRoute[LAST];
+  }
+
+  *sections(from, to) {
+    while (from < to) {
+      const chapter = this.at(from);
+      const boundary = chapter.index === LAST ? this.encoreStart ?? Infinity : chapter.end;
+      const end = Math.min(to, boundary);
+      yield { start: from, end, chapter };
+      from = end;
+    }
   }
 }
 

@@ -36,7 +36,7 @@ try {
   $('boot-message').textContent = 'Your browser could not start 3D graphics. Try enabling hardware acceleration or opening this game in a recent browser.';
   throw error;
 }
-await Promise.all([prepareTusker(!device.quality.shadows), stage.prepareLighting(), prepareVehicles()]);
+await Promise.all([prepareTusker(!device.quality.shadows), stage.prepareLighting(), stage.prepareBackwaters(), prepareVehicles()]);
 const route = new Route();
 const env = new Environment(stage.scene, device.quality.propDensity, route);
 const level = new Level(stage.scene, route);

@@ -9,11 +9,11 @@ This log tracks the audio, elephant, scenery and chapter progression work. The r
 | Elephant presentation and Aana Album | Implemented | Added real coat and trunk textures, refined head silhouette and fitted ornaments on the existing rig. Twelve named encounters unlock the Album on first grab and persist in the existing local save. |
 | Pooram and Thirunakkara | Implemented | Rebuilt the large Pooram entrance and night lamps. Kottayam appears as a photographed story interlude before Alappuzha. |
 | Athirappilly | Implemented | Wide real-photo waterfall set piece with animated flow highlights, rocks and spray. |
-| Alappuzha | Implemented | Punnamada photo backdrop, low banks, moving chundan vallams with 20 animated paddlers, and a one-time 45-point race rescue. |
+| Alappuzha | Implemented | Full-screen Punnamada backdrop blends into the playable water. The road and the river meet at the same boundary used by traffic. Vehicles and boats keep clearance, and the chundan vallam rescue still awards 45 points. |
 | Munnar | Implemented | Curved tea rows, shade trees and valley mist layered behind the swing route. |
 | Paappans, riders and crowds | Implemented | Seated paappans, animated fans and whisks, instanced cheering spectators and chenda players. |
 | Chapter progression | Implemented | Distance checkpoints switch the HUD, scene, music and story card together. The finale meter tracks three bonks. Encore starts at the win and resets its meter for each 500 m leg. |
-| Build and local playtest | Complete | All 41 tests and the production build passed. Chrome checks covered the five story chapters, all five Encore regions, Continue, retries, Album replay, pause and the compact touch controls. |
+| Build and local playtest | Complete | All 45 tests and the production build passed. Chrome checks covered both Alappuzha shorelines in Story and Encore, wide and compact layouts, the five story chapters, Continue, retries, Album replay, pause and touch controls. |
 | Physical phone playtest | Pending | Check sustained frame rate, touchscreen handling, loop seam and speaker balance on iPhone Safari and Android Chrome. |
 | Public audio reuse | Awaiting source details | Confirm source or permission for the supplied tracks before public distribution. |
 
@@ -33,6 +33,7 @@ Chapter loops trim the dead air at the restart and blend the audio across the se
 - At 568 × 320 the Album scrolls internally and the replay control fits in the viewport. The standard menu opens the Album outside the inspector.
 - A live Pooram Morning run showed the meter filling as Gedi swung. Chrome checkpoint tests confirmed the Thirunakkara interlude, chapter progress resets and a finale win before the 2,000 m mark. Encore switched through five regions and back to Pooram Morning with the right soundtrack and a fresh meter each time. The finale unlock made Encore available from the menu.
 - The slow Chrome test session triggered the adaptive rendering fallback and continued to advance the meter. Frame rate remained low in that session. Device performance still needs a physical phone playtest.
+- A fall across the Athirappilly shoreline now shows Backwater Bedlam at 0/400 m on the impact frame. A second shoreline fall switched to Munnar and Kasavinte. Tests cover lethal falls and the full width of boat and road traffic at both shores, including Encore starts with fractional coordinates.
 
 ## References and resources
 

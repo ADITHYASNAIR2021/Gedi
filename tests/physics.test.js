@@ -80,7 +80,7 @@ test('perfect windows reject downward, backward and slow releases', () => {
 function landingFixture(y, vy, top = 2.9) {
   const game = Object.create(Game.prototype);
   game.sw = new Swinger(); game.sw.reset(0, y); game.sw.vel.y = vy;
-  Object.assign(game, { holding: false, current: null, cooldown: 0, bounceCooldown: 0,
+  Object.assign(game, { route: new Route(), holding: false, current: null, cooldown: 0, bounceCooldown: 0,
     level: { elephants: [], vehicles: [{ mesh: { position: { x: 0, y: 0 }, userData: { top, half: 4.5 } }, label: 'BUS' }], boats: [], findAnjaam: () => null },
     fall: () => {}, bounce: () => { game.bounced = true; },
   });
@@ -111,6 +111,19 @@ test('30, 60 and 120fps feed the same fixed-step swing', () => {
   };
   const reference = simulate(120);
   for (const fps of [30, 60]) assert.deepEqual(simulate(fps), reference);
+});
+
+test('streamed surfaces meet exactly at both shores in Story and fractional Encore routes', () => {
+  const route = new Route();
+  const spans = (from, to) => Array.from(route.sections(from, to), ({ start, end, chapter }) => [start, end, chapter.cfg.water]);
+  assert.deepEqual(spans(640, 1060), [[640, 650, false], [650, 1050, true], [1050, 1060, false]]);
+  assert.deepEqual(spans(1990, 2100), [[1990, 2100, false]]);
+  const origin = 1881.13;
+  route.startEncore(origin);
+  const shore = origin + 1000;
+  const far = origin + 1500;
+  assert.deepEqual(spans(shore - 10, far + 10), [[shore - 10, shore, false], [shore, far, true], [far, far + 10, false]]);
+  assert.equal(route.at(origin + 4500).leg, 10);
 });
 
 test('chapter starts, early victory and Encore leg breaks resolve to the same route for the world and meter', () => {

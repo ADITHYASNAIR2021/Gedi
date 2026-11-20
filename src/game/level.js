@@ -4,7 +4,7 @@ import {
   makeFritter, makeChaya, makeChakka, makeChilli, makePorotta, makeMonkey, makePedestal,
 } from '../entities/props.js';
 import { makeBus, makeAuto } from '../entities/vehicles.js';
-import { makeVallam, animateVallam } from '../entities/vallam.js';
+import { makeVallam, animateVallam, VALLAM_FOOTPRINT } from '../entities/vallam.js';
 import { Route, chapterStart, ELEPHANT_NAMES, ELEPHANT_HOMES, pick } from './story.js';
 import { AANAS, aanaAt } from './aanas.js';
 
@@ -86,13 +86,13 @@ export class Level {
     const scale = variant === 'baby' ? 0.75 : 1;
     const decorated = !!featured || (pooram ? Math.random() < 0.9 : Math.random() < 0.25);
     const parasol = variant !== 'baby' && Math.random() < cfg.parasol;
-    let pedestal = 0;
-    if (cfg.water) pedestal = rand(0.3, 0.5 + cfg.pedestal);
-    else if (cfg.pedestal && Math.random() < 0.5) pedestal = rand(0.4, cfg.pedestal);
-
     const gap = rand(cfg.gap[0], cfg.gap[1]);
     const trunkX = dist + gap;
     const x = trunkX + TRUNK_X * scale;
+    const surface = this.route.at(x).cfg;
+    let pedestal = 0;
+    if (surface.water) pedestal = rand(0.3, 0.5 + surface.pedestal);
+    else if (surface.pedestal && Math.random() < 0.5) pedestal = rand(0.4, surface.pedestal);
     const e = this.addElephant(x, {
       variant, decorated, parasol,
       cloth: featured?.cloth ?? Math.floor(Math.random() * 5),
@@ -120,8 +120,7 @@ export class Level {
       const roadRoll = Math.random();
       if (roadRoll < cfg.bus) this.addVehicle(makeBus(), x + rand(15, 30), -rand(2, 5), 'KSRTC RESCUE!');
       else if (roadRoll < cfg.bus + cfg.auto) this.addVehicle(makeAuto(), x + rand(8, 25), -rand(3, 7), 'AUTO CHETTAN SAVE!');
-    } else if ((index !== 2 || dist >= chapterStart(2) + 60)
-      && Math.random() < cfg.boat && this.boats.every(b => Math.abs(b.mesh.position.x - dist) > 21)) {
+    } else if ((index !== 2 || dist >= chapterStart(2) + 60) && Math.random() < cfg.boat) {
       this.addBoat(dist + gap * 0.5, -rand(.7, 2.1));
     }
 
@@ -130,6 +129,8 @@ export class Level {
   }
 
   addVehicle(mesh, x, speed, label) {
+    const { footprint } = mesh.userData;
+    if (!this.fitsLane(x, footprint, false) || !this.hasTrafficRoom(x, footprint, this.vehicles)) return null;
     mesh.position.set(x, 0, 3.6);
     this.scene.add(mesh);
     const vehicle = { mesh, speed, label, startX: x, previousX: x, previousY: 0 };
@@ -138,12 +139,28 @@ export class Level {
   }
 
   addBoat(x, speed, race = false) {
+    if (!this.fitsLane(x, VALLAM_FOOTPRINT, true) || !this.hasTrafficRoom(x, VALLAM_FOOTPRINT, this.boats)) return null;
     const mesh = makeVallam(race);
     mesh.position.set(x, 0, 1.6);
     this.scene.add(mesh);
-    const boat = { mesh, speed, phase: Math.random() * 6, label: 'VALLAM RESCUE!', rescueBonus: race ? 45 : 0 };
+    const boat = { mesh, speed, previousX: x, previousY: 0, phase: Math.random() * 6, label: 'VALLAM RESCUE!', rescueBonus: race ? 45 : 0 };
     this.boats.push(boat);
     return boat;
+  }
+
+  fitsLane(x, [left, right], water) {
+    // A hull or vehicle is much shorter than the shortest land or water section.
+    return this.route.at(x - left).cfg.water === water && this.route.at(x + right).cfg.water === water;
+  }
+
+  hasTrafficRoom(x, [left, right], peers, except) {
+    const clearance = 0.8;
+    return peers.every(peer => {
+      if (peer === except) return true;
+      const { position, userData } = peer.mesh;
+      const [peerLeft, peerRight] = userData.footprint;
+      return x + right + clearance <= position.x - peerLeft || x - left - clearance >= position.x + peerRight;
+    });
   }
 
   refreshAhead(x) {
@@ -255,18 +272,26 @@ export class Level {
 
   stepTraffic(dt) {
     this.trafficTime += dt;
-    for (const vehicle of this.vehicles) {
-      const { mesh, speed } = vehicle;
-      vehicle.previousX = mesh.position.x;
-      mesh.position.x += speed * dt;
-    }
+    for (const vehicle of this.vehicles) this.moveTraffic(vehicle, dt, false);
     for (const boat of this.boats) {
       const p = boat.mesh.position;
-      boat.previousX = p.x;
       boat.previousY = p.y;
-      p.x += boat.speed * dt;
+      this.moveTraffic(boat, dt, true);
       p.y = Math.sin(this.trafficTime * 1.5 + boat.phase) * 0.1;
     }
+  }
+
+  moveTraffic(traffic, dt, water) {
+    const { position, userData } = traffic.mesh;
+    traffic.previousX = position.x;
+    if (!traffic.speed) return;
+    const next = position.x + traffic.speed * dt;
+    const edge = traffic.speed < 0 ? next - userData.footprint[0] : next + userData.footprint[1];
+    if (this.route.at(edge).cfg.water !== water) {
+      traffic.speed = 0;
+      return;
+    }
+    if (this.hasTrafficRoom(next, userData.footprint, water ? this.boats : this.vehicles, traffic)) position.x = next;
   }
 
   // Best grabbable anchor around Gedi (prefers the ones ahead).
@@ -301,7 +326,7 @@ export class Level {
   }
 
   respawnElephant(x, chapter) {
-    const safe = this.elephants.filter(e => e.variant !== 'sneezy' && this.route.at(e.group.position.x).key === chapter.key);
+    const safe = this.elephants.filter(e => e.variant !== 'sneezy' && this.route.at(e.trunkAnchor.pos.x + .4).key === chapter.key);
     return safe.reduce((best, e) => !best || Math.abs(e.trunkAnchor.pos.x - x) < Math.abs(best.trunkAnchor.pos.x - x) ? e : best, null)
       ?? this.elephants.find(e => e.trunkAnchor.pos.x >= x - 8)
       ?? this.elephants[this.elephants.length - 1];

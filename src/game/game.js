@@ -136,22 +136,25 @@ export class Game {
     this.stage.setBiome(ch.cfg, instant);
     this.env.setBiome(ch.cfg);
     this.audio.setTempo(ch.cfg.bpm);
-    this.audio.setChapterMusic(ch.cfg.music);
+    if (!this.dying) this.audio.setChapterMusic(ch.cfg.music);
     this.audio.setAmbience?.(ch.cfg);
     if (!instant && !this.demo) this.hud.banner(ch.cfg.name, ch.cfg.place);
   }
 
-  recordDistance() {
+  syncChapter() {
     const x = this.sw.pos.x;
-    if (x <= this.distance) return;
-    this.distPts += (x - this.distance) * 2 * (this.rage > 0 ? 2 : 1);
-    this.distance = x;
+    if (x > this.distance) {
+      this.distPts += (x - this.distance) * 2 * (this.rage > 0 ? 2 : 1);
+      this.distance = x;
+    }
+    const next = this.route.at(this.distance);
+    if (next.key !== this.chapter.key) this.changeChapter(next);
   }
 
   changeChapter(next, victory = false) {
     const previous = this.chapter;
-    const storyCard = !this.demo && !previous.encore;
-    this.applyBiome(next, storyCard);
+    const storyCard = !this.dying && !this.demo && !previous.encore;
+    this.applyBiome(next, storyCard || !!this.dying);
     this.kutt.reset(this.distance + 12, next.index);
     for (const shot of this.projectiles) this.stage.scene.remove(shot.mesh);
     this.projectiles.length = 0;
@@ -386,7 +389,6 @@ export class Game {
   }
 
   fall() {
-    this.recordDistance();
     if (this.demo || this.rage > 0 || this.shield) {
       const label = this.demo ? '' : this.rage > 0 ? 'RAGE BOUNCE!' : 'CHAYA SAVE!';
       if (this.rage <= 0) this.shield = false;
@@ -401,7 +403,7 @@ export class Game {
     this.acc = 0;
     this.stunned = 0;
     this.stage.shake = 0.3;
-    if (this.cfg.water) { this.fx.splash(p); this.sfx('splash'); } else { this.fx.dust(p); this.sfx('thud'); }
+    if (this.route.at(this.sw.pos.x).cfg.water) { this.fx.splash(p); this.sfx('splash'); } else { this.fx.dust(p); this.sfx('thud'); }
     this.takeDamage(FALL_DAMAGE);
     if (this.health > 0) {
       this.fallT = 0.9;
@@ -462,7 +464,8 @@ export class Game {
         if (this.fallT > 0 || this.dying > 0 || this.sling) break;
       }
     }
-    if (!this.fallT && !this.dying) this.tickWorld(dt, beforeX, beforeY);
+    if (this.fallT || this.dying) this.syncChapter();
+    else this.tickWorld(dt, beforeX, beforeY);
     this.tickVisuals(dt);
 
     if (this.pendingCard) {
@@ -535,7 +538,7 @@ export class Game {
         this.dustT -= STEP;
         if (this.dustT <= 0) {
           this.dustT = 0.15;
-          if (!this.cfg.water) this.fx.dust(new THREE.Vector3(sw.pos.x, 0.1, 1.8));
+          if (!this.route.at(sw.pos.x).cfg.water) this.fx.dust(new THREE.Vector3(sw.pos.x, 0.1, 1.8));
         }
       }
       return;
@@ -590,7 +593,7 @@ export class Game {
         }
         return;
       }
-      const slingReach = this.cfg?.water ? .88 : 1.4;
+      const slingReach = this.route.at(sw.pos.x).cfg.water ? .88 : 1.4;
       if (sw.vel.y < 0 && feet < slingReach) {
         const el = this.level.findAnjaam(sw.pos.x);
         if (el) {

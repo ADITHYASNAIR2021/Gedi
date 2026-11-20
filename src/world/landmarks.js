@@ -162,17 +162,9 @@ export function athirappilly(g, x, z) {
 }
 
 const levee = new THREE.MeshStandardMaterial({ color: '#607650', roughness: .92 });
-let punnamadaPhoto;
-export function alappuzhaShore(g, x0, backdrop) {
-  for (let i = 0; i < 3; i++) {
-    const x = x0 + 6 + i * 14;
+export function alappuzhaShore(g, start, end) {
+  for (let x = start + 6, i = 0; x <= end - 5; x += 14, i++) {
     mesh(g, rock, levee, x, -.58, -32 + Math.sin(x * .08)*2.8, 9.8, 1.7 + i*.15, 4.1);
-  }
-  if (backdrop) {
-    punnamadaPhoto ||= scenicPhoto('alappuzha', '#e0ddbb');
-    const vista = mesh(g, plane, punnamadaPhoto, x0 + 20, 8, -59, 116, 33);
-    vista.userData.dynamic = true;
-    vista.renderOrder = -2;
   }
 }
 
