@@ -7,6 +7,7 @@ export function createSound(settings) {
     shot: [760, 355, .09, 'triangle', .07],
     perfect: [1090, 510, .13, 'triangle', .1],
     hit: [430, 940, .105, 'sine', .11],
+    refill: [540, 1180, .22, 'sine', .1],
     bite: [205, 72, .2, 'triangle', .11],
     cleared: [520, 880, .24, 'sine', .09],
   };

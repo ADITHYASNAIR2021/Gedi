@@ -263,8 +263,15 @@ function drawFace(ctx, time, charging, mood) {
 
 export function drawMosquito(ctx, bug, time) {
   const flap = Math.sin(time * 64 + (bug.id || 0));
+  const dart = bug.flight === 'dart';
   ctx.save();
   ctx.translate(bug.x, bug.y);
+  if (bug.supply) {
+    ellipse(ctx, 0, -4, 26, 25, '#ffda5c21');
+    ellipse(ctx, 16, -19, 8, 8, '#ffe2a0');
+    line(ctx, [[12, -19], [20, -19]], '#523446', 1.5);
+    line(ctx, [[16, -23], [16, -15]], '#523446', 1.5);
+  }
   if (bug.warning) {
     const radius = 23 + Math.sin(time * 21) * 3;
     ctx.strokeStyle = '#ff9b70b0';
@@ -280,14 +287,14 @@ export function drawMosquito(ctx, bug, time) {
   ctx.scale(bug.facing || 1, 1);
   ctx.rotate(-.16);
   ellipse(ctx, -4, -6, 21, 13, '#0c122846', -.3);
-  const wingColor = '#b8d9ecb8';
-  ellipse(ctx, -10, -5, 13, 3.8, '#a9baf798', -.61 + flap * .62);
+  const wingColor = bug.supply ? '#ffd889dc' : dart ? '#9beeeeb8' : '#b8d9ecb8';
+  ellipse(ctx, -10, -5, 13, 3.8, bug.supply ? '#d4bb6c9e' : '#a9baf798', -.61 + flap * .62);
   ellipse(ctx, -5, -14, 13, 4.4, wingColor, .52 + flap * .5);
-  ellipse(ctx, 2, -13, 11, 3.5, '#e1eff5c2', .86 - flap * .48);
+  ellipse(ctx, 2, -13, 11, 3.5, bug.supply ? '#fff0acc2' : '#e1eff5c2', .86 - flap * .48);
   line(ctx, [[1, 3], [-6, 10], [-14, 11]], '#d39b9d', 1.35);
   line(ctx, [[3, 4], [1, 12], [-6, 16]], '#d39b9d', 1.35);
   line(ctx, [[7, 4], [9, 11], [6, 14]], '#d39b9d', 1.35);
-  ellipse(ctx, -8, 1, 10, 5.1, '#dc696e', -.23);
+  ellipse(ctx, -8, 1, dart ? 12 : 10, 5.1, bug.supply ? '#d99350' : dart ? '#5bc4c7' : '#dc696e', -.23);
   line(ctx, [[-10, -3], [-8, 2]], '#ff9f89', 1.7);
   line(ctx, [[-14, -1], [-12, 3]], '#ff9f89', 1.4);
   ellipse(ctx, 2, 0, 7, 5.8, '#7f657d');

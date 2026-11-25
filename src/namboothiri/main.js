@@ -40,8 +40,11 @@ function boot() {
     reactionAt: -Infinity,
     mood: null,
     moodUntil: 0,
+    noticeUntil: 0,
   };
   const score = $('score');
+  const ammo = $('ammo');
+  const ammoHud = $('ammo-hud');
   const clock = $('clock');
   const clockLabel = $('clock-label');
   const timeFill = $('time-fill');
@@ -49,6 +52,7 @@ function boot() {
   const pauseButton = $('pause');
   const reaction = $('reaction');
   const combo = $('combo');
+  const waveNotice = $('wave-notice');
   const meter = $('charging');
   const chargeLabel = $('charge-label');
   const chargeFill = $('charge-fill');
@@ -85,7 +89,7 @@ function boot() {
       const name = document.createElement('strong');
       name.textContent = night.name;
       const detail = document.createElement('small');
-      detail.textContent = night.detail;
+      detail.textContent = `${night.detail} · ${night.ammo} ammo`;
       description.append(name, detail);
       const badge = document.createElement('span');
       badge.className = 'night-record';
@@ -148,6 +152,7 @@ function boot() {
     state.effects = [];
     state.mood = null;
     state.reactionAt = -Infinity;
+    state.noticeUntil = 0;
     reaction.hidden = true;
     show('play');
     draw();
@@ -176,12 +181,15 @@ function boot() {
     const { progress, best } = recordNight(run, state.progress);
     state.progress = progress;
     const cleared = run.outcome === 'cleared';
+    const outOfAmmo = run.lossCause === 'ammo';
     const endless = run.night.duration === Infinity;
     const previousNight = `${run.night.name} · ${formatTime(run.time)}`;
     const nextNight = NIGHTS[run.level + 1];
     setText($('result-night'), previousNight);
-    setText($('result-title'), cleared ? 'Night cleared!' : 'The mosquitoes win.');
-    setText($('result-detail'), cleared ? `${nextNight.name} is unlocked.` : 'Three bites. So much for sleep.');
+    setText($('result-title'), cleared ? 'Night cleared!' : outOfAmmo ? 'Out of ammo' : 'The mosquitoes win.');
+    setText($('result-detail'), cleared ? `${nextNight.name} is unlocked.` : outOfAmmo
+      ? 'Save a shot for the gold-winged carriers.'
+      : 'Three bites. So much for sleep.');
     setText($('result-score'), scoreFormat.format(run.score));
     setText($('result-best'), best ? 'New personal best' : 'Score');
     setText($('result-hits'), run.hits);
@@ -204,9 +212,12 @@ function boot() {
     const duration = run?.night.duration ?? NIGHTS[0].duration;
     const time = run?.time ?? 0;
     const bites = run?.bites ?? 0;
+    const rounds = run?.ammo ?? NIGHTS[0].ammo;
     const endless = duration === Infinity;
     setText(score, scoreFormat.format(run?.score ?? 0));
-    setText(clockLabel, endless ? 'Survived' : 'Time left');
+    setText(ammo, rounds);
+    ammoHud.classList.toggle('low', rounds <= 3);
+    setText(clockLabel, run ? `Wave ${run.wave}${endless ? '' : '/3'}` : 'Time left');
     setText(clock, formatTime(endless ? time : Math.ceil(duration - time)));
     timeFill.style.transform = `scaleX(${endless ? 1 : 1 - time / duration})`;
     if (lastBites !== bites) {
@@ -217,6 +228,7 @@ function boot() {
     }
     combo.hidden = !run || run.streak < 2 || state.screen !== 'play';
     if (!combo.hidden) setText(combo, `${run.streak}× streak`);
+    waveNotice.hidden = state.screen !== 'play' || time >= state.noticeUntil;
     meter.hidden = !charge;
     if (charge) {
       meter.dataset.ready = String(charge.ready);
@@ -278,6 +290,10 @@ function boot() {
         if (event.first) announceReaction();
       }
       if (event.type === 'cleared') sound.play('cleared');
+      if (event.type === 'wave') {
+        setText(waveNotice, `Wave ${event.number} · ${event.faster ? 'Faster flights' : 'Swarm incoming'}`);
+        state.noticeUntil = run.time + 1.75;
+      }
     }
     state.effects = state.effects.filter(effect => run.time - effect.born < effect.duration);
     const threats = run.bugs.some(bug => bug.warning);
@@ -299,16 +315,22 @@ function boot() {
     const shot = run.shoot(state.target, run.time - state.chargeAt, touch ? TOUCH_AIM_PADDING : 0);
     state.chargeAt = null;
     if (!shot) return;
-    const { direction, perfect, hits } = shot;
+    const { direction, perfect, hits, ammoGained } = shot;
     const reach = hits.length ? hits[hits.length - 1].distance + 16 : 650;
     addEffect({ type: 'spark', direction, perfect, reach, duration: .24 });
     sound.play(perfect ? 'perfect' : 'shot');
-    if (hits.length) sound.play('hit');
+    if (ammoGained) sound.play('refill');
+    else if (hits.length) sound.play('hit');
     for (const hit of hits) {
       addEffect({ type: 'hit', x: hit.bug.x, y: hit.bug.y, color: perfect ? '#ffdd8d' : '#e2d2fe', label: `+${hit.points}`, duration: .58 });
     }
     if (hits.length > 1) {
       addEffect({ type: 'hit', x: 210, y: 435, color: '#ffda86', label: 'DOUBLE ZAP!', duration: .75 });
+    }
+    if (ammoGained) {
+      const { bug } = hits.find(hit => hit.bug.supply) ?? hits[0];
+      const x = Math.min(WIDTH - 50, Math.max(50, bug.x));
+      addEffect({ type: 'hit', x, y: bug.y + 34, color: '#c2f6c9', label: `+${ammoGained} AMMO`, duration: .85 });
     }
     if (shot.bigCombo) announceReaction();
     state.mood = 'shot';

@@ -3,7 +3,7 @@
 A browser arcade built with Vite. Both games launch from the picker at `/`.
 
 - **Gedi the Tarzan** at `/gedi/` is a Three.js elephant swing adventure through five Kerala chapters. Hold to grab a trunk or tail and release to fly. On a phone, play in landscape.
-- **Namboothiri vs. the Mosquitoes** at `/namboothiri/` is a portrait Canvas 2D game. Hold and drag to aim, then release to fire. A gold charge widens the shot and can zap two mosquitoes. On a keyboard, aim with the arrows and hold and release Space. Survive three nights to unlock Endless Buzz.
+- **Namboothiri vs. the Mosquitoes** at `/namboothiri/` is a portrait Canvas 2D game. Hold and drag to aim, then release to fire. A gold charge widens the shot and refunds one round on a double zap. Gold-winged mosquitoes replenish two rounds. On a keyboard, aim with the arrows and hold and release Space. Survive three nights to unlock Endless Buzz, where later waves bring faster, denser swarms.
 
 Each game saves its own progress on the device. Sound, Voice and Theri preferences are shared. Namboothiri uses the supplied portrait, synthesized effects and captioned reactions.
 

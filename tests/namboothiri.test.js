@@ -15,6 +15,7 @@ test('quick shots hit one mosquito, gold shots can hit two, and misses reset the
   run.bugs.push({ id: 3, x: aim.x - 23, y: 295 }, { id: 4, x: aim.x + 28, y: 172 });
   const goldShot = run.shoot(aim, .56);
   assert.equal(goldShot.perfect, true);
+  assert.equal(goldShot.ammoGained, 1);
   assert.deepEqual(goldShot.hits.map(hit => hit.bug.id), [3, 2]);
   assert.equal(run.score, 100 + 165 + 180);
   assert.equal(run.streak, 3);
@@ -31,10 +32,11 @@ test('mosquitoes signal a dive before a bite, and the third bite ends the run on
   const run = new NightRun(0, () => .5);
   const relevantEvents = [];
   for (let i = 0; i < 1500 && !run.outcome; i++) {
-    relevantEvents.push(...run.update(.02).map(event => event.type));
+    relevantEvents.push(...run.update(.02).filter(event => event.type !== 'wave').map(event => event.type));
   }
   assert.deepEqual(relevantEvents, ['warning', 'bite', 'warning', 'bite', 'warning', 'bite', 'lost']);
   assert.equal(run.bites, 3);
+  assert.equal(run.lossCause, 'bites');
   assert.equal(run.shoot({ x: 80, y: 220 }, .56), null);
   assert.deepEqual(run.update(1), []);
 });
@@ -49,29 +51,72 @@ test('touch padding forgives a small aim offset without changing the shot score'
   assert.equal(run.score, 100);
 });
 
-function survive(run, until) {
+test('a final shot can replenish ammo before a dry clip ends the night', () => {
+  const run = new NightRun(0);
+  const aim = { x: SHOT_ORIGIN.x, y: 180 };
+  assert.equal(run.ammo, 11);
+  run.ammo = 1;
+  run.bugs = [{ id: 1, x: aim.x, y: 220, supply: true }];
+  const refill = run.shoot(aim, .1);
+  assert.equal(refill.ammoGained, 2);
+  assert.equal(run.ammo, 2);
+  assert.deepEqual(run.update(.26), []);
+  assert.equal(run.shoot(aim, .1).ammoGained, 0);
+  run.update(.26);
+  run.shoot(aim, .1);
+  assert.equal(run.ammo, 0);
+  assert.equal(run.shoot(aim, .56), null);
+  assert.deepEqual(run.update(.01), [{ type: 'lost' }]);
+  assert.equal(run.lossCause, 'ammo');
+  assert.deepEqual(run.update(.02), []);
+});
+
+function survive(run, until, perfect = true) {
+  let nextShot = 0;
   while (run.time < until && !run.outcome) {
     run.update(.02);
-    const target = run.bugs.find(bug => bug.x > 30 && bug.x < 390 && run.time - bug.born > .65);
-    if (target) run.shoot(target, .56);
+    if (run.time < nextShot) continue;
+    const targets = run.bugs.filter(bug => bug.x > 30 && bug.x < 390 && run.time - bug.born > (perfect ? .7 : .42));
+    const target = targets.sort((a, b) => a.born + a.hover - b.born - b.hover)[0];
+    if (target && run.shoot(target, perfect ? .56 : .1)) nextShot = run.time + (perfect ? .56 : .28);
   }
 }
 
-test('all three nights clear at their finish times and Endless Buzz keeps running', () => {
-  for (const [level, night] of NIGHTS.entries()) {
+test('the campaign remains clearable while Monsoon rewards charged doubles', () => {
+  const totals = [];
+  for (const [level, night] of NIGHTS.slice(0, 3).entries()) {
     const run = new NightRun(level, () => .5);
-    survive(run, night.duration === Infinity ? 95 : night.duration);
-    if (level === 3) {
-      assert.equal(run.outcome, null);
-      assert.ok(run.time >= 95);
-      assert.ok(run.hits >= 35);
-    } else {
-      assert.equal(run.outcome, 'cleared');
-      assert.equal(run.time, night.duration);
-      assert.ok(run.hits >= 7);
-    }
+    survive(run, night.duration);
+    assert.equal(run.outcome, 'cleared');
+    assert.equal(run.time, night.duration);
     assert.equal(run.bites, 0);
+    assert.ok(run.ammo > 0);
+    totals.push(run.hits);
   }
+  assert.ok(totals[0] < totals[1] && totals[1] < totals[2]);
+  const quickShots = new NightRun(2, () => .5);
+  survive(quickShots, quickShots.night.duration, false);
+  assert.equal(quickShots.lossCause, 'ammo');
+});
+
+test('Endless Buzz speeds up and sends larger groups as waves advance', () => {
+  const run = new NightRun(3, () => .5);
+  const initialAmmo = run.ammo;
+  run.update(.55);
+  const first = run.bugs[0];
+  assert.equal(run.bugs.length, 2);
+  assert.equal(first.flight, 'dart');
+  const late = new NightRun(3, () => .5);
+  late.time = 47.98;
+  late.groups = 1;
+  assert.deepEqual(late.update(.04), [{ type: 'wave', number: 5, faster: true }]);
+  assert.equal(late.ammo, initialAmmo);
+  assert.equal(late.bugs.length, 3);
+  assert.ok(late.bugs[0].speed > first.speed);
+  assert.ok(late.bugs[0].warningTime < first.warningTime);
+  survive(run, 36);
+  assert.equal(run.outcome, null);
+  assert.equal(run.wave, 4);
 });
 
 test('night scores and unlocks persist separately from Gedi saves and shared preferences', () => {
