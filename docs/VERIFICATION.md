@@ -51,7 +51,7 @@ Chrome was used for development and the built production preview.
 - Local QA controls exercised the normal chapter completion card, all three finale contacts, the victory card, results, chapter retry and the offline leaderboard message. These controls trigger encounters directly; they are not evidence of completing the entire story by hand.
 - No application warnings or errors were observed in the final production browser check.
 
-The local QA page is `http://localhost:5173/?inspect&mobile`. It is development-only and uses a separate save slot. The release build omits the inspector entirely.
+The local Gedi QA page is `http://localhost:5173/gedi/?inspect&mobile`. It is development-only and uses a separate save slot. The release build omits the inspector entirely.
 
 ## Remaining external checks
 

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#171522" />
+    <meta name="description" content="Hold, aim and release to zap mosquitoes in this portrait arcade game from Gedi Games." />
+    <title>Namboothiri vs. the Mosquitoes · Gedi Games</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='12' fill='%23312b48'/%3E%3Cpath d='M31 11a15 15 0 1 0 6 23A14 14 0 0 1 31 11Z' fill='%23ffdc92'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/arcade/base.css" />
+    <link rel="stylesheet" href="/src/namboothiri/style.css" />
+  </head>
+  <body class="night-page" data-screen="menu">
+    <header class="night-header">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">✦</span> Gedi Games</a>
+      <a class="back-link" href="/"><span aria-hidden="true">←</span> All games</a>
+    </header>
+    <main class="night-layout">
+      <aside class="game-intro">
+        <div class="moon-icon" aria-hidden="true">☾</div>
+        <h1>Namboothiri <span>vs. the</span> Mosquitoes</h1>
+        <p>It’s past midnight. The mosquitoes have other plans.</p>
+        <div class="help-card">
+          <h2>How to play</h2>
+          <p>Hold and drag to aim. Release when the stick glows gold for a wider spark.</p>
+          <p class="keyboard-help"><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> Aim <span></span><kbd>Space</kbd> Charge &amp; fire</p>
+          <p class="bite-rule"><span aria-hidden="true">♡</span> Three bites end the night.</p>
+        </div>
+      </aside>
+
+      <section class="cabinet" aria-label="Namboothiri mosquito game">
+        <header class="game-hud">
+          <div class="hud-score"><span>Score</span><strong id="score">0</strong></div>
+          <div class="hud-time"><span id="clock-label">Time left</span><strong id="clock">0:34</strong></div>
+          <div class="hud-controls">
+            <div class="hearts" id="hearts" role="img" aria-label="Three bites remaining">
+              <span aria-hidden="true">♥</span><span aria-hidden="true">♥</span><span aria-hidden="true">♥</span>
+            </div>
+            <button id="pause" class="pause-button" type="button" aria-label="Pause game" disabled><span aria-hidden="true"></span></button>
+          </div>
+        </header>
+        <div class="time-track" aria-hidden="true"><div id="time-fill"></div></div>
+        <div class="room">
+          <canvas id="room" width="840" height="1320" tabindex="-1" aria-label="Bedroom playfield" aria-describedby="control-hint"></canvas>
+          <div id="reaction" class="reaction" hidden></div>
+          <div id="combo" class="combo-count" hidden></div>
+          <div id="charging" class="charge-meter" hidden>
+            <span id="charge-label">Charging</span>
+            <div class="charge-track"><div id="charge-fill"></div><i></i></div>
+          </div>
+
+          <div id="overlay" class="game-overlay">
+            <section id="menu-panel" class="game-panel" aria-labelledby="menu-title">
+              <p class="mobile-name">Namboothiri vs. the Mosquitoes</p>
+              <h2 id="menu-title" tabindex="-1">Pick a night</h2>
+              <p class="mobile-charge-help">Release when the stick glows gold for a wider spark.</p>
+              <div id="night-list" class="night-list"></div>
+              <div class="preferences" aria-label="Game preferences">
+                <button type="button" data-preference="sound" aria-pressed="true">Sound</button>
+                <button type="button" data-preference="voice" aria-pressed="true">Reactions</button>
+                <button type="button" data-preference="theri" aria-pressed="true" title="Use spicy reaction lines">Theri</button>
+              </div>
+            </section>
+
+            <section id="pause-panel" class="game-panel centered-panel" aria-labelledby="pause-title" hidden>
+              <h2 id="pause-title" tabindex="-1">Paused</h2>
+              <p>Even the mosquitoes can wait.</p>
+              <div class="panel-actions">
+                <button class="action primary" id="resume" type="button">Resume</button>
+                <button class="action" id="paused-retry" type="button">Restart night</button>
+                <button class="action" id="paused-menu" type="button">Night select</button>
+              </div>
+            </section>
+
+            <section id="result-panel" class="game-panel centered-panel" aria-labelledby="result-title" hidden>
+              <p id="result-night" class="result-night"></p>
+              <h2 id="result-title" tabindex="-1"></h2>
+              <p id="result-detail"></p>
+              <div class="result-score"><strong id="result-score"></strong><span id="result-best">Score</span></div>
+              <dl class="result-stats">
+                <div><dt>Zapped</dt><dd id="result-hits"></dd></div>
+                <div><dt>Accuracy</dt><dd id="result-accuracy"></dd></div>
+                <div><dt>Best streak</dt><dd id="result-streak"></dd></div>
+              </dl>
+              <div class="panel-actions">
+                <button class="action primary" id="next-night" type="button" hidden>Next night</button>
+                <button class="action" id="retry" type="button">Try again</button>
+                <button class="action" id="result-menu" type="button">Night select</button>
+              </div>
+            </section>
+            <section id="error-panel" class="game-panel centered-panel" role="alert" hidden>
+              <h2>Game unavailable</h2><p>This browser couldn’t start the playfield.</p>
+              <a class="action primary" href="/">All games</a>
+            </section>
+          </div>
+        </div>
+        <footer id="control-hint" class="control-hint"><span aria-hidden="true">✦</span><span id="hint-text">Hold to charge · Drag to aim · Release to zap</span></footer>
+      </section>
+    </main>
+    <script type="module" src="/src/namboothiri/main.js"></script>
+  </body>
+</html>

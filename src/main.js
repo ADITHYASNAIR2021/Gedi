@@ -283,6 +283,12 @@ window.addEventListener('keyup', (e) => {
 window.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 window.addEventListener('blur', pause);
+window.addEventListener('pageshow', (event) => {
+  if (!event.persisted) return;
+  save.refreshSettings();
+  audio.applySettings();
+  refreshMenu();
+});
 
 $('btn-fullscreen').onclick = async () => {
   try {
